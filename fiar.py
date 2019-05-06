@@ -69,8 +69,8 @@ class StartGame:
         self.playerName = playerName
         self.player=1
         self.opponent=2
-        self.rows = 4#6
-        self.columns = 5#7
+        self.rows = 6
+        self.columns = 7
         self.opponentColor = "R"
         self.playerColor = "Y"
         self.opponentName = "Computer"
@@ -83,6 +83,12 @@ class StartGame:
     
     def reset(self):
         self.playingField= np.zeros([self.rows,self.columns], dtype=int)
+
+    def checkFull(self):
+        if self.counts>=self.rows*self.columns:
+            print("a draw!!!!")
+            return True
+            #self.reset()
 
     def checkForWinner(self):
 

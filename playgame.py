@@ -20,6 +20,8 @@ def main():
 
         if Game.addCoin(ColumnNo,Game.nextTurn):
             Game.ShowField2()
+            if Game.checkFull(): # check if the game is over (a draw)
+                break
             if Game.checkForWinner()!=0:
                 break
 
