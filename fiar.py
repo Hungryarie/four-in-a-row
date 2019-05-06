@@ -11,27 +11,17 @@ def main():
     Game.ShowField2()
 
     while True:
-        
-
         if Game.nextTurn==1:
             print (f"{Game.playerColor}:{Game.playerName}'s turn")
-            
-            ColumnNo= int(input('column no:'))
-
-            Game.addCoin(ColumnNo,Game.nextTurn)
-            Game.ShowField2()
-
-        if Game.checkForWinner()!=0:
-            break
-
+            ColumnNo= input('column no:')
         if Game.nextTurn==2:
             print (f"{Game.opponentColor}:{Game.opponentName}'s turn")
+            ColumnNo=random.randint(0,Game.columns-1)
 
-            Game.addCoin(random.randint(0,Game.columns-1),Game.nextTurn)
+        if Game.addCoin(ColumnNo,Game.nextTurn):
             Game.ShowField2()
-        
-        if Game.checkForWinner()!=0:
-            break
+            if Game.checkForWinner()!=0:
+                break
 
 
 def NProtate45(array):
@@ -79,8 +69,8 @@ class StartGame:
         self.playerName = playerName
         self.player=1
         self.opponent=2
-        self.rows = 6
-        self.columns = 7
+        self.rows = 4#6
+        self.columns = 5#7
         self.opponentColor = "R"
         self.playerColor = "Y"
         self.opponentName = "Computer"
@@ -147,28 +137,32 @@ class StartGame:
     def addCoin (self, inColumn, WhosTurn):
         print (f"adding {WhosTurn} coin in column {inColumn}")
 
+        try:
+            inColumn=int(inColumn)
+        except:
+            print (f"'{inColumn}' is no integer, try again")
+            return False
+        if inColumn>=self.columns or inColumn<0:
+            print (f"'{inColumn}' is out of bounds, try again")
+            return False
         i=1
-        success = False
         while True:
             try:
                 if self.playingField[self.rows-i, inColumn] == 0:
                     self.playingField[self.rows-i, inColumn] = WhosTurn
-                    success = True
-                    break
+                    # Set the next turn
+                    #print (f"current player={self.nextTurn}. next = {abs(self.nextTurn -2)+1}")
+                    self.nextTurn=abs(self.nextTurn -2)+1
+                    # iterate the number of tries
+                    self.counts +=1
+                    return True
                 else:
                     # print (f"row {self.rows-i} is already filled with {self.playingField[self.rows-i, inColumn]}")
                     i+=1
-
             except:
                 print (f"column {inColumn} is already totally filled")
-                break
-        
-        if success:
-            # Set the next turn
-            #print (f"current player={self.nextTurn}. next = {abs(self.nextTurn -2)+1}")
-            self.nextTurn=abs(self.nextTurn -2)+1
-            # iterate the number of tries
-            self.counts +=1
+                return False
+
 
     def ShowField(self):
         print (" |0|1|2|3|4|5|6| << colums")
