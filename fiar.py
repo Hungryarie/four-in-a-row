@@ -8,7 +8,7 @@ def main():
     PlayerName="Arnoud"
     print (f"playername: {PlayerName}")
     Game = StartGame(PlayerName)
-    Game.ShowField()
+    Game.ShowField2()
 
     while True:
         
@@ -85,10 +85,14 @@ class StartGame:
         self.playerColor = "Y"
         self.opponentName = "Computer"
         self.nextTurn=random.randint(1,2)
-        self.playingField= np.zeros([self.rows,self.columns], dtype=int)
+        #self.playingField= np.zeros([self.rows,self.columns], dtype=int)
+        self.reset()
         self.winner=0                   # winner id. 0 is no winner yet
         self.winnerhow="none"
         self.counts=0                   # amount of tries before winning
+    
+    def reset(self):
+        self.playingField= np.zeros([self.rows,self.columns], dtype=int)
 
     def checkForWinner(self):
 
