@@ -7,7 +7,7 @@ def main():
     #PlayerName = input('Player name:')
     PlayerName="Arnoud"
     print (f"playername: {PlayerName}")
-    Game = StartGame(PlayerName)
+    Game = FiarGame(PlayerName)
     Game.ShowField2()
 
     while True:
@@ -64,7 +64,7 @@ def checkFourOnARow( x ):
     #print (f"x: {x} >> countsame: {count+1} >> win: {win} >> winner: {winner}")
     return winner #sum(x)
 
-class StartGame:
+class FiarGame:
     def __init__(self, playerName):
         self.playerName = playerName
         self.player=1
@@ -75,14 +75,14 @@ class StartGame:
         self.playerColor = "Y"
         self.opponentName = "Computer"
         self.nextTurn=random.randint(1,2)
-        #self.playingField= np.zeros([self.rows,self.columns], dtype=int)
         self.reset()
-        self.winner=0                   # winner id. 0 is no winner yet
-        self.winnerhow="none"
-        self.counts=0                   # amount of tries before winning
     
     def reset(self):
         self.playingField= np.zeros([self.rows,self.columns], dtype=int)
+        self.winner=0                   # winner id. 0 is no winner yet
+        self.winnerhow="none"
+        self.counts=0                   # amount of tries before winning
+        self._invalid_move_played = False
 
     def checkFull(self):
         if self.counts>=self.rows*self.columns:
@@ -140,8 +140,13 @@ class StartGame:
         print("Check for a Vertical Winner")
         return sum(np.apply_along_axis( checkFourOnARow, axis=0, arr=self.playingField ))
 
-    def addCoin (self, inColumn, WhosTurn):
-        print (f"adding {WhosTurn} coin in column {inColumn}")
+    def setNextPlayer(self):
+        # Set the next turn
+        #print (f"current player={self.nextTurn}. next = {abs(self.nextTurn -2)+1}")
+        self.nextTurn=abs(self.nextTurn -2)+1
+
+    def addCoin (self, inColumn, ActivePlayer):
+        print (f"adding {ActivePlayer} coin in column {inColumn}")
 
         try:
             inColumn=int(inColumn)
@@ -155,18 +160,17 @@ class StartGame:
         while True:
             try:
                 if self.playingField[self.rows-i, inColumn] == 0:
-                    self.playingField[self.rows-i, inColumn] = WhosTurn
-                    # Set the next turn
-                    #print (f"current player={self.nextTurn}. next = {abs(self.nextTurn -2)+1}")
-                    self.nextTurn=abs(self.nextTurn -2)+1
-                    # iterate the number of tries
-                    self.counts +=1
+                    self.playingField[self.rows-i, inColumn] = ActivePlayer
+                    self._invalid_move_played = False
+                    self.setNextPlayer() # Set the next turn  
+                    self.counts +=1 # iterate the number of tries
                     return True
                 else:
                     # print (f"row {self.rows-i} is already filled with {self.playingField[self.rows-i, inColumn]}")
                     i+=1
             except:
                 print (f"column {inColumn} is already totally filled")
+                self._invalid_move_played = True
                 return False
 
 

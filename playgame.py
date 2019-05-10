@@ -1,13 +1,14 @@
 import numpy as np 
 import random
-from fiar import StartGame
+import players
+from fiar import FiarGame
 
-def main():
+def playgame():
     print ("Starting game")
     #PlayerName = input('Player name:')
     PlayerName="Arnoud"
     print (f"playername: {PlayerName}")
-    Game = StartGame(PlayerName)
+    Game = FiarGame(PlayerName)
     Game.ShowField2()
 
     while True:
@@ -25,6 +26,12 @@ def main():
             if Game.checkForWinner()!=0:
                 break
 
+def playAgainstRandom():
+    p1 = players.Human()
+    p2 = players.Drunk()
+    game = FiarGame(p1.name)
+    pass
 
 if __name__ == '__main__':
-    main()
+    #playgame()
+    playAgainstRandom()
