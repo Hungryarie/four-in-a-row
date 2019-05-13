@@ -42,28 +42,64 @@ def checkFourOnARow( x ):
     #print (f"x: {x} >> countsame: {count+1} >> win: {win} >> winner: {winner}")
     return winner #sum(x)
 
+
 class FiarGame:
-    def __init__(self, playerName):
-        self.playerName = playerName
-        self.player=1
-        self.opponent=2
+    def __init__(self, player1, player2,
+                 winning_reward=10,
+                 losing_reward=-10,
+                 tie_reward=-5,
+                 invalid_move_reward=-20):
+
         self.rows = 6
         self.columns = 7
-        self.opponentColor = "R"
-        self.playerColor = "Y"
-        self.opponentName = "Computer"
-        self.nextTurn=random.randint(1,2)
+
+        self.player1 = player1
+        self.player1.color = "Y"
+        self.player1.player_id = 1
+
+        self.player2 = player2
+        self.player2.color = "R"
+        self.player2.player_id = 2
+
         self.reset()
     
     def reset(self):
         self.playingField= np.zeros([self.rows,self.columns], dtype=int)
-        self.winner=0                   # winner id. 0 is no winner yet
+        self.winner=0                       # winner id. 0 is no winner yet
         self.winnerhow="none"
-        self.counts=0                   # amount of tries before winning
+        self.turns=0                       # amount of tries before winning
+        self.nextTurn=random.randint(1,2)   # random pick a player to start
+        self.current_player=random.randint(1,2)   # random pick a player to start
         self._invalid_move_played = False
 
+    @property
+    def active_player(self):
+        if self.current_player == 1:
+            return self.player1
+        else:
+            return self.player2
+
+    @property
+    def inactive_player(self):
+        if self.current_player == 2:
+            return self.player1
+        else:
+            return self.player2
+
+    def setNextPlayer(self):
+        # Set the next turn
+        #print (f"current player={self.nextTurn}. next = {abs(self.nextTurn -2)+1}")
+        self.nextTurn=abs(self.nextTurn -2)+1
+        self.current_player = abs(self.current_player -2)+1
+
+    def getPlayerById(self, id):
+        if self.player1.player_id == id:
+            return self.player1
+        else:
+            return self.player2
+
     def checkFull(self):
-        if self.counts>=self.rows*self.columns:
+        if self.turns>=self.rows*self.columns:
             print("a draw!!!!")
             return True
             #self.reset()
@@ -87,7 +123,7 @@ class FiarGame:
             self.winner=self.checkForWinnerDiaLeft()
             self.winnerhow="Diagnal Left"
         if self.winner!=0:
-            print (f"winner:{self.winner}, how:{self.winnerhow}")
+            print (f"winner:{self.getPlayerById(self.winner).name}, id:{self.winner}, how:{self.winnerhow}, in #turns:{self.turns}")
         else:
             print ("no winner yet")
 
@@ -118,10 +154,7 @@ class FiarGame:
         print("Check for a Vertical Winner")
         return sum(np.apply_along_axis( checkFourOnARow, axis=0, arr=self.playingField ))
 
-    def setNextPlayer(self):
-        # Set the next turn
-        #print (f"current player={self.nextTurn}. next = {abs(self.nextTurn -2)+1}")
-        self.nextTurn=abs(self.nextTurn -2)+1
+
 
     def addCoin (self, inColumn, ActivePlayer):
         print (f"adding {ActivePlayer} coin in column {inColumn}")
@@ -141,7 +174,7 @@ class FiarGame:
                     self.playingField[self.rows-i, inColumn] = ActivePlayer
                     self._invalid_move_played = False
                     self.setNextPlayer() # Set the next turn  
-                    self.counts +=1 # iterate the number of tries
+                    self.turns +=1 # iterate the number of tries
                     return True
                 else:
                     # print (f"row {self.rows-i} is already filled with {self.playingField[self.rows-i, inColumn]}")
@@ -164,9 +197,9 @@ class FiarGame:
                 if j==0:
                     j=" "
                 elif j==1:
-                    j=self.playerColor
+                    j=self.player1.color
                 elif j==2:
-                    j=self.opponentColor
+                    j=self.player2.color
                 row+="|"+str(j)   
             row+="|"       
             print (row)

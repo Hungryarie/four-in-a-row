@@ -9,6 +9,7 @@ class Player:
     """
     name = None
     player_id = None
+    color = None
 
     def __init__(self):
         pass
@@ -48,8 +49,7 @@ class Drunk(Player):
     Drunk player always selects a random valid move
     """
     def select_cell(self, board, **kwargs):
-        available_cells = np.where(board == 0)[0]
-        return random.choice(available_cells)
+        return random.randint(0,np.size(board,1)-1)
 
     def learn(self, **kwargs):
         pass
