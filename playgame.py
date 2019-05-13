@@ -1,7 +1,7 @@
 import numpy as np 
 import random
 import players
-from fiar import FiarGame
+from game import FiarGame
 
 def playgame():
     print ("Starting game")
