@@ -173,7 +173,7 @@ class FiarGame:
                 if self.playingField[self.rows-i, inColumn] == 0:
                     self.playingField[self.rows-i, inColumn] = ActivePlayer
                     self._invalid_move_played = False
-                    self.setNextPlayer() # Set the next turn  
+                    #self.setNextPlayer() # Set the next turn  
                     self.turns +=1 # iterate the number of tries
                     return True
                 else:

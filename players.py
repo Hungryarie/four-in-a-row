@@ -55,40 +55,6 @@ class Drunk(Player):
         pass
 
 
-class Novice(Player):
-    """
-    A more sophisticated bot, which follows the following strategy:
-    1) If it already has 2-in-a-row, capture the required cell for 3
-    2) If not, and if the opponent has 2-in-a-row, capture the required cell to prevent hi, from winning
-    3) Else, select a random vacant cell
-    """
-    def find_two_of_three(self, board, which_player_id):
-        cell = None
-        winning_options = [[0, 1, 2], [3, 4, 5], [6, 7, 8],
-                           [0, 3, 6], [1, 4, 7], [2, 5, 8],
-                           [0, 4, 8], [2, 4, 6]]
-        random.shuffle(winning_options)
-        for seq in winning_options:
-            s = board[seq[0]] + board[seq[1]] + board[seq[2]]
-            if s == 2 * which_player_id:
-                a = np.array([board[seq[0]], board[seq[1]], board[seq[2]]])
-                c = np.where(a == 0)[0][0]
-                cell = seq[c]
-                break
-        return cell
-
-    def select_cell(self, board, **kwargs):
-        cell = self.find_two_of_three(board,self.player_id)
-        if cell is None:
-            cell = self.find_two_of_three(board,-self.player_id)
-        if cell is None:
-            available_cells = np.where(board == 0)[0]
-            cell = random.choice(available_cells)
-        return cell
-
-    def learn(self, **kwargs):
-        pass
-
 
 class QPlayer(Player):
     """

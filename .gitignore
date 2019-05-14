@@ -14,4 +14,7 @@ test.
 *.log
 
 # compile files
-.pyc
+*.pyc
+
+# Models
+models/*
