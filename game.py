@@ -2,47 +2,6 @@ import numpy as np
 import random
 
 
-def NProtate45(array):
-    # Rotate numpy array 45 degrees
-    rows, cols = array.shape
-    rot = np.zeros([rows,cols+rows-1],dtype=int)
-    for i in range(rows):
-        for j in range(cols):
-            rot[i,i + j] = array[i,j]
-    return rot
-
-def NProtate275(array):
-    # Rotate numpy array 275 degrees
-    rows, cols = array.shape
-    rot = np.zeros([rows,cols+rows-1],dtype=int)
-    for i in range(rows):
-        for j in range(cols):
-            rot[i,i - j] = array[i,j]
-    return rot
-
-def checkFourOnARow( x ):
-    #print ("x:", x)
-    count = 0
-    same = 0
-    win = False
-    winner = 0
-    for y in x:
-        #print (y)
-        if same==y and y!=0:
-            count+=1
-        else:
-            count = 0
-        if count>=3:
-            # 3 checks = 4 on a row
-            win = True
-            winner = same
-            break
-        same=y
-
-    #print (f"x: {x} >> countsame: {count+1} >> win: {win} >> winner: {winner}")
-    return winner #sum(x)
-
-
 class FiarGame:
     def __init__(self, player1, player2,
                  winning_reward=10,
@@ -121,6 +80,14 @@ class FiarGame:
             #self.reset()
 
     def Winnerinfo(self):
+        """
+        returns winner information:
+        - name
+        - color
+        - id
+        - how it won (mode)
+        - in # of turns
+        """
         if self.winner!=0:
             return (f"winner:{self.getPlayerById(self.winner).name} "
                     f"({self.getPlayerById(self.winner).color}), " 
@@ -158,28 +125,71 @@ class FiarGame:
 
     def checkForWinnerDiaRight (self):
         #print("Check for a Diagnal Right Winner")
-        array= NProtate45(self.playingField) # scew the playingfield 45degrees 
-        return sum(np.apply_along_axis( checkFourOnARow, axis=0, arr=array )) #axis=0: vertical
+        array= self.NProtate45(self.playingField) # scew the playingfield 45degrees 
+        return sum(np.apply_along_axis( self.checkFourOnARow, axis=0, arr=array )) #axis=0: vertical
 
     def checkForWinnerDiaLeft (self):
         #print("Check for a Diagnal Left Winner")
-        array= NProtate275(self.playingField) # scew the playingfield minus 45degrees 
-        return sum(np.apply_along_axis( checkFourOnARow, axis=0, arr=array )) #axis=0: vertical       
+        array= self.NProtate275(self.playingField) # scew the playingfield minus 45degrees 
+        return sum(np.apply_along_axis( self.checkFourOnARow, axis=0, arr=array )) #axis=0: vertical       
 
     def checkForWinnerHor (self): #, WhosTurn):
         #print("Check for a Horizontal Winner")
-        #print (np.apply_along_axis( checkFourOnARow, axis=1, arr=self.playingField ))
+        #print (np.apply_along_axis( self.checkFourOnARow, axis=1, arr=self.playingField ))
         """
-        if sum(np.apply_along_axis( checkFourOnARow, axis=1, arr=self.playingField ))==WhosTurn:
+        if sum(np.apply_along_axis( self.checkFourOnARow, axis=1, arr=self.playingField ))==WhosTurn:
             return True
         else:
             return False 
         """
-        return sum(np.apply_along_axis( checkFourOnARow, axis=1, arr=self.playingField ))      
+        return sum(np.apply_along_axis( self.checkFourOnARow, axis=1, arr=self.playingField ))      
         
     def checkForWinnerVer (self): #, WhosTurn):
         #print("Check for a Vertical Winner")
-        return sum(np.apply_along_axis( checkFourOnARow, axis=0, arr=self.playingField ))
+        return sum(np.apply_along_axis( self.checkFourOnARow, axis=0, arr=self.playingField ))
+
+    @staticmethod
+    def NProtate45(array):
+        # Rotate numpy array 45 degrees
+        rows, cols = array.shape
+        rot = np.zeros([rows,cols+rows-1],dtype=int)
+        for i in range(rows):
+            for j in range(cols):
+                rot[i,i + j] = array[i,j]
+        return rot
+
+    @staticmethod
+    def NProtate275(array):
+        # Rotate numpy array 275 degrees
+        rows, cols = array.shape
+        rot = np.zeros([rows,cols+rows-1],dtype=int)
+        for i in range(rows):
+            for j in range(cols):
+                rot[i,i - j] = array[i,j]
+        return rot
+
+    @staticmethod
+    def checkFourOnARow( x ):
+        #print ("x:", x)
+        count = 0
+        same = 0
+        win = False
+        winner = 0
+        for y in x:
+            #print (y)
+            if same==y and y!=0:
+                count+=1
+            else:
+                count = 0
+            if count>=3:
+                # 3 checks = 4 on a row
+                win = True
+                winner = same
+                break
+            same=y
+
+        #print (f"x: {x} >> countsame: {count+1} >> win: {win} >> winner: {winner}")
+        return winner #sum(x)
 
 
     def addCoin (self, inColumn, ActivePlayer):
