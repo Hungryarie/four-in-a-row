@@ -22,20 +22,20 @@ def NProtate275(array):
 
 def checkFourOnARow( x ):
     #print ("x:", x)
-    count=0
-    same=0
-    win=False
-    winner=0
+    count = 0
+    same = 0
+    win = False
+    winner = 0
     for y in x:
         #print (y)
         if same==y and y!=0:
             count+=1
         else:
-            count=0
+            count = 0
         if count>=3:
             # 3 checks = 4 on a row
-            win=True
-            winner=same
+            win = True
+            winner = same
             break
         same=y
 
@@ -67,6 +67,7 @@ class FiarGame:
         self.playingField= np.zeros([self.rows,self.columns], dtype=int)
         self.winner=0                       # winner id. 0 is no winner yet
         self.winnerhow="none"
+        self.done = False
         self.turns=0                       # amount of tries before winning
         self.nextTurn=random.randint(1,2)   # random pick a player to start
         self.current_player=random.randint(1,2)   # random pick a player to start
@@ -98,11 +99,34 @@ class FiarGame:
         else:
             return self.player2
 
+    def GetActionSpace(self):
+        ActionList = []
+        ActionList.extend(range(self.columns))
+        return ActionList
+
+    def GetActionSize(self):
+        return self.columns
+
+    def GetState(self):
+        flatStateArray = self.playingField.flatten()
+        return flatStateArray
+    
+    def GetObservationSize(self):
+        return len(self.GetState())
+
     def checkFull(self):
         if self.turns>=self.rows*self.columns:
             print("a draw!!!!")
             return True
             #self.reset()
+
+    def Winnerinfo(self):
+        if self.winner!=0:
+            return (f"winner:{self.getPlayerById(self.winner).name} "
+                    f"({self.getPlayerById(self.winner).color}), " 
+                    f"id:{self.winner}, how:{self.winnerhow}, in #turns:{self.turns}")
+        else:
+            return ("no winner yet")
 
     def checkForWinner(self):
 
@@ -123,24 +147,27 @@ class FiarGame:
             self.winner=self.checkForWinnerDiaLeft()
             self.winnerhow="Diagnal Left"
         if self.winner!=0:
-            print (f"winner:{self.getPlayerById(self.winner).name}, id:{self.winner}, how:{self.winnerhow}, in #turns:{self.turns}")
+            self.done = True
+            #print(self.Winnerinfo())
+            #print (f"winner:{self.getPlayerById(self.winner).name}, id:{self.winner}, how:{self.winnerhow}, in #turns:{self.turns}")
         else:
-            print ("no winner yet")
+            pass
+            #print ("no winner yet")
 
         return self.winner
 
     def checkForWinnerDiaRight (self):
-        print("Check for a Diagnal Right Winner")
+        #print("Check for a Diagnal Right Winner")
         array= NProtate45(self.playingField) # scew the playingfield 45degrees 
         return sum(np.apply_along_axis( checkFourOnARow, axis=0, arr=array )) #axis=0: vertical
 
     def checkForWinnerDiaLeft (self):
-        print("Check for a Diagnal Left Winner")
+        #print("Check for a Diagnal Left Winner")
         array= NProtate275(self.playingField) # scew the playingfield minus 45degrees 
         return sum(np.apply_along_axis( checkFourOnARow, axis=0, arr=array )) #axis=0: vertical       
 
     def checkForWinnerHor (self): #, WhosTurn):
-        print("Check for a Horizontal Winner")
+        #print("Check for a Horizontal Winner")
         #print (np.apply_along_axis( checkFourOnARow, axis=1, arr=self.playingField ))
         """
         if sum(np.apply_along_axis( checkFourOnARow, axis=1, arr=self.playingField ))==WhosTurn:
@@ -151,13 +178,12 @@ class FiarGame:
         return sum(np.apply_along_axis( checkFourOnARow, axis=1, arr=self.playingField ))      
         
     def checkForWinnerVer (self): #, WhosTurn):
-        print("Check for a Vertical Winner")
+        #print("Check for a Vertical Winner")
         return sum(np.apply_along_axis( checkFourOnARow, axis=0, arr=self.playingField ))
 
 
-
     def addCoin (self, inColumn, ActivePlayer):
-        print (f"adding {ActivePlayer} coin in column {inColumn}")
+        #print (f"adding {ActivePlayer} coin in column {inColumn}")
 
         try:
             inColumn=int(inColumn)

@@ -7,8 +7,11 @@ def playAgainstRandom():
     p1 = players.Human()
     p2 = players.Drunk()
     p1.name = "Arnoud"
-    p2.name = "Henk ouwe gek"
+    p2.name = "Henk"
     Game = FiarGame(p1, p2)
+
+    print(Game.GetActionSpace())
+    print(Game.GetState())
 
     print (f"the game of '{Game.player1.name}' vs '{Game.player2.name}'")
 
@@ -24,9 +27,10 @@ def playAgainstRandom():
             if Game.checkFull(): # check if the game is over (a draw)
                 break
             if Game.checkForWinner()!=0:
+                print(Game.Winnerinfo())
                 break
             Game.setNextPlayer()
-   
+        
 
 if __name__ == '__main__':
     #playgame()

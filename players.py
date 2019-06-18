@@ -55,6 +55,9 @@ class Drunk(Player):
         pass
 
 
+class DQNPlayer(Player):
+    pass
+
 
 class QPlayer(Player):
     """
