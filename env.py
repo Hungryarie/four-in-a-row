@@ -4,8 +4,10 @@
 
 import numpy as np 
 import random
+import matplotlib.pyplot as plt
 import players
 from game import FiarGame
+
 
 class enviroment(FiarGame):
     def __init__(self, *args):
@@ -36,6 +38,20 @@ class enviroment(FiarGame):
         """
         return random.randint(0, self.action_space_n-1)
 
+    def reward(self):
+        reward = 0
+        if self.winner==0 and self.done==True:
+            reward = self.REWARD_TIE
+        if self.winner==1:
+            reward = self.REWARD_WINNING
+        if self.winner==2:
+            reward = self.REWARD_LOSING
+        if self._invalid_move_played:
+            reward = self.REWARD_INVALID_MOVE
+
+        return reward
+       
+
     def step(self, action):
         """
         returns
@@ -43,34 +59,36 @@ class enviroment(FiarGame):
         """
         self.addCoin(action, self.active_player.player_id)
             
-        self.checkForWinner()
-        reward=1
-        return self.GetState(), reward, self.done, self.info()
+        self.CheckGameEnd()
+        
+        return self.GetState(), self.reward(), self.done, self.info()
      
     def info(self):
         dicti = {"active_player" : self.active_player.name,
                  "moves_played" : self.turns}
         return dicti
     
-    def test(self, episodes, render=False):
-        for i_episode in range(episodes):
-            print (f"episode: {i_episode}")
-            observation = self.reset()
-            for t in range(self.observation_space_n):
-                action = self.sample()
-                observation, reward, done, info = self.step(action)
+    def test(self, render=False):
+        observation, done, ep_reward = self.reset(), False, 0
 
-                if not self._invalid_move_played:
-                    self.setNextPlayer()
-                    t-=1 # 
-                if render:
-                    self.render()
-                print(observation)
-                if done:
-                    print(self.Winnerinfo())
-                    print(f"Episode finished after {t+1} timesteps")
-                    print("\n")
-                    break
+        while not done:
+            action = self.sample()
+            observation, reward, done, info = self.step(action)
+
+            if not self._invalid_move_played:
+                self.setNextPlayer()
+            ep_reward += reward
+
+            if render:
+                self.render()
+            print(observation)
+            print (f"reward: {reward}")
+            if done:
+                self.render()
+                print(self.Winnerinfo())
+                print(f"Episode finished after {self.turns} timesteps")
+                print("\n")
+        return ep_reward
 
 
 p1 = players.Human()
@@ -79,8 +97,26 @@ p1.name = "Arnoud"
 p2.name = "Henk"
 env = enviroment(p1,p2)
 
-print(env.observation_space_n)
-env.test(2, True)
 
+# print(env.observation_space_n)
+# for i_episode in range(3):
+#     print (f"episode: {i_episode}")
+#     ep_reward = env.test(False)
+#     print (f"ep_reward: {ep_reward}")
 
+print ("evaluate Training...")
+rewards_history = []
+for i_episode in range(40):
+    observation = env.reset()
+    print (observation)
+    rew = env.test(render=False)
+    
+    rewards_history.append(rew)
+    print(f"Episode finished after {rew} timesteps")
+
+plt.style.use('seaborn')
+plt.plot(0, len(rewards_history), rewards_history)
+plt.xlabel('Episode')
+plt.ylabel('Total Reward')
+plt.show()
     

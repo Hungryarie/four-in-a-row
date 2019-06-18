@@ -15,7 +15,7 @@ def playAgainstRandom():
 
     print (f"the game of '{Game.player1.name}' vs '{Game.player2.name}'")
 
-    while Game.winner==0:
+    while not Game.done:
         #print (f"{Game.opponentColor}:{Game.opponentName}'s turn")
         #print (f"cell random:{Game.active_player.select_cell(Game.playingField)}")
         print (f"> Turn: {Game.active_player.name} ({Game.active_player.color})")
@@ -24,9 +24,7 @@ def playAgainstRandom():
 
         if Game.addCoin(ColumnNo,Game.current_player):
             Game.ShowField2()
-            if Game.checkFull(): # check if the game is over (a draw)
-                break
-            if Game.checkForWinner()!=0:
+            if Game.CheckGameEnd():
                 print(Game.Winnerinfo())
                 break
             Game.setNextPlayer()

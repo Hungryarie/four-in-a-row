@@ -3,11 +3,12 @@ import random
 
 
 class FiarGame:
-    def __init__(self, player1, player2,
-                 winning_reward=10,
-                 losing_reward=-10,
-                 tie_reward=-5,
-                 invalid_move_reward=-20):
+    REWARD_WINNING = 10
+    REWARD_LOSING = -10
+    REWARD_TIE = -5
+    REWARD_INVALID_MOVE = -2
+
+    def __init__(self, player1, player2):
 
         self.rows = 6
         self.columns = 7
@@ -73,11 +74,6 @@ class FiarGame:
     def GetObservationSize(self):
         return len(self.GetState())
 
-    def checkFull(self):
-        if self.turns>=self.rows*self.columns:
-            print("a draw!!!!")
-            return True
-            #self.reset()
 
     def Winnerinfo(self):
         """
@@ -93,10 +89,12 @@ class FiarGame:
                     f"({self.getPlayerById(self.winner).color}), " 
                     f"id:{self.winner}, how:{self.winnerhow}, in #turns:{self.turns}")
         else:
-            return ("no winner yet")
+            return ("no winner (yet)")
 
-    def checkForWinner(self):
-
+    def CheckGameEnd(self):
+        """
+        returns whether the game has ended.
+        """
         if self.winner==0:
             # check for horizontal winner
             self.winner=self.checkForWinnerHor()
@@ -115,13 +113,20 @@ class FiarGame:
             self.winnerhow="Diagnal Left"
         if self.winner!=0:
             self.done = True
-            #print(self.Winnerinfo())
-            #print (f"winner:{self.getPlayerById(self.winner).name}, id:{self.winner}, how:{self.winnerhow}, in #turns:{self.turns}")
-        else:
-            pass
-            #print ("no winner yet")
+        if self.checkFull():
+            # check for a tie / draw
+            self.done = True
+        #print(self.Winnerinfo())
 
-        return self.winner
+        return self.done
+
+
+    def checkFull(self):
+        if self.turns>=self.rows*self.columns:
+            print("a draw!!!!")
+            self.winnerhow = "draw / tie"
+            return True
+            #self.reset()
 
     def checkForWinnerDiaRight (self):
         #print("Check for a Diagnal Right Winner")
@@ -210,7 +215,7 @@ class FiarGame:
                     self.playingField[self.rows-i, inColumn] = ActivePlayer
                     self._invalid_move_played = False
                     #self.setNextPlayer() # Set the next turn  
-                    self.turns +=1 # iterate the number of tries
+                    self.turns +=1 # iterate the number of turns
                     return True
                 else:
                     # print (f"row {self.rows-i} is already filled with {self.playingField[self.rows-i, inColumn]}")
