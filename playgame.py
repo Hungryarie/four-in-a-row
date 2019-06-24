@@ -6,6 +6,9 @@ from game import FiarGame
 from env import enviroment
 from model import Model
 
+SHOW_EVERY = 50
+
+
 def trainNN():
     #p1 = players.Human()
     model = Model(num_actions=7)
@@ -20,7 +23,8 @@ def trainNN():
 
 
 def PlayInEnv():
-    p1 = players.Human()
+
+    p1 = players.Drunk()
     p2 = players.Drunk()
     p1.name = "Arnoud"
     p2.name = "Henk"
@@ -28,13 +32,18 @@ def PlayInEnv():
 
     print ("evaluate Training...")
     rewards_history = []
-    for i_episode in range(3):
+    for i_episode in range(101):
         observation, *_ = env.reset()
-        print (observation)
+        #print (observation)
         rew = env.test(render=False)
         
         rewards_history.append(rew)
         print(f"Episode {i_episode} finished with rewardpoints: {rew}")
+
+        if i_episode % SHOW_EVERY == 0:
+            print(f"{SHOW_EVERY} ep mean: {np.mean(rewards_history[-SHOW_EVERY:])}")
+        
+
 
     plt.style.use('seaborn')
     plt.plot(0, len(rewards_history), rewards_history)

@@ -68,7 +68,7 @@ class enviroment(FiarGame):
         return dicti
     
     def test(self, render=False):
-        observation, done, ep_reward = self.reset(), False, 0
+        observation, ep_reward, done, _ = self.reset() #, False, 0
 
         while not done:
             # action = self.sample()
@@ -82,11 +82,13 @@ class enviroment(FiarGame):
 
             if render:
                 self.render()
-            print(observation)
-            print (f"reward: {reward}")
+                #print(observation)
+                #print (f"reward: {reward}")
+
             if done:
-                self.render()
-                print(self.Winnerinfo())
-                print(f"Episode finished after {self.turns} timesteps")
-                print("\n")
+                pass
+                #self.render()
+                #print(self.Winnerinfo())
+                #print(f"Episode finished after {self.turns} timesteps")
+                #print("\n")
         return ep_reward
