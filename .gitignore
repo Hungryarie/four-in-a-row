@@ -11,7 +11,7 @@ venv.bak/
 .vscode/
 
 # Test code
-test*.
+test*
 
 # ignore all logs
 *.log
