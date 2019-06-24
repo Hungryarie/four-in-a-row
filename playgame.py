@@ -1,7 +1,47 @@
 import numpy as np 
 import random
+import matplotlib.pyplot as plt
 import players
 from game import FiarGame
+from env import enviroment
+from model import Model
+
+def trainNN():
+    #p1 = players.Human()
+    model = Model(num_actions=7)
+    p1 = players.DQNPlayer(model)
+    p2 = players.Drunk()
+    p1.name = "DQN"
+    p2.name = "Drunk Henk"
+    env = enviroment(p1,p2)
+
+    env.test()
+
+
+
+def PlayInEnv():
+    p1 = players.Human()
+    p2 = players.Drunk()
+    p1.name = "Arnoud"
+    p2.name = "Henk"
+    env = enviroment(p1,p2)
+
+    print ("evaluate Training...")
+    rewards_history = []
+    for i_episode in range(3):
+        observation, *_ = env.reset()
+        print (observation)
+        rew = env.test(render=False)
+        
+        rewards_history.append(rew)
+        print(f"Episode {i_episode} finished with rewardpoints: {rew}")
+
+    plt.style.use('seaborn')
+    plt.plot(0, len(rewards_history), rewards_history)
+    plt.xlabel('Episode')
+    plt.ylabel('Total Reward')
+    plt.show()
+
 
 def playAgainstRandom():
     p1 = players.Human()
@@ -20,7 +60,7 @@ def playAgainstRandom():
         #print (f"cell random:{Game.active_player.select_cell(Game.playingField)}")
         print (f"> Turn: {Game.active_player.name} ({Game.active_player.color})")
         
-        ColumnNo=Game.active_player.select_cell(Game.playingField) #random.randint(0,Game.columns-1)
+        ColumnNo=Game.active_player.select_cell(board=Game.playingField, state=Game.GetState(), actionspace=Game.GetActionSpace()) #random.randint(0,Game.columns-1)
 
         if Game.addCoin(ColumnNo,Game.current_player):
             Game.ShowField2()
@@ -31,5 +71,6 @@ def playAgainstRandom():
         
 
 if __name__ == '__main__':
-    #playgame()
-    playAgainstRandom()
+    #playAgainstRandom()
+    PlayInEnv()
+    #trainNN()

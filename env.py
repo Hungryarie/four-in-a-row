@@ -21,7 +21,7 @@ class enviroment(FiarGame):
     def reset(self):
         """
         resets the game and 
-        returns the observationspace / state
+        returns the observationspace / state, reward, done, info
         """
         super().reset()
         return self.GetState(), 0, False, None
@@ -58,7 +58,6 @@ class enviroment(FiarGame):
         observation, reward, done, info
         """
         self.addCoin(action, self.active_player.player_id)
-            
         self.CheckGameEnd()
         
         return self.GetState(), self.reward(), self.done, self.info()
@@ -72,7 +71,9 @@ class enviroment(FiarGame):
         observation, done, ep_reward = self.reset(), False, 0
 
         while not done:
-            action = self.sample()
+            # action = self.sample()
+            # action = self.active_player.select_cell(self.playingField)
+            action  = self.active_player.select_cell(board=self.playingField, state=self.GetState(), actionspace=self.GetActionSpace())
             observation, reward, done, info = self.step(action)
 
             if not self._invalid_move_played:
@@ -89,34 +90,3 @@ class enviroment(FiarGame):
                 print(f"Episode finished after {self.turns} timesteps")
                 print("\n")
         return ep_reward
-
-
-p1 = players.Human()
-p2 = players.Drunk()
-p1.name = "Arnoud"
-p2.name = "Henk"
-env = enviroment(p1,p2)
-
-
-# print(env.observation_space_n)
-# for i_episode in range(3):
-#     print (f"episode: {i_episode}")
-#     ep_reward = env.test(False)
-#     print (f"ep_reward: {ep_reward}")
-
-print ("evaluate Training...")
-rewards_history = []
-for i_episode in range(40):
-    observation = env.reset()
-    print (observation)
-    rew = env.test(render=False)
-    
-    rewards_history.append(rew)
-    print(f"Episode finished after {rew} timesteps")
-
-plt.style.use('seaborn')
-plt.plot(0, len(rewards_history), rewards_history)
-plt.xlabel('Episode')
-plt.ylabel('Total Reward')
-plt.show()
-    
