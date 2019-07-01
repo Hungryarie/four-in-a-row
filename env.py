@@ -24,7 +24,7 @@ class enviroment(FiarGame):
         returns the observationspace / state, reward, done, info
         """
         super().reset()
-        return self.GetState(), 0, False, None
+        return self.GetState() #, 0, False, None
     
     def render(self):
         """
@@ -68,7 +68,7 @@ class enviroment(FiarGame):
         return dicti
     
     def test(self, render=False):
-        observation, ep_reward, done, _ = self.reset() #, False, 0
+        observation, ep_reward, done = self.reset() , False, 0
 
         while not done:
             # action = self.sample()
