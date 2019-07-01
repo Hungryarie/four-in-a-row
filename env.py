@@ -24,8 +24,9 @@ class enviroment(FiarGame):
         returns the observationspace / state, reward, done, info
         """
         super().reset()
-        return self.GetState() #, 0, False, None
-    
+        #return self.GetState() #, 0, False, None
+        return self.playingField
+
     def render(self):
         """
         reders the game
@@ -36,21 +37,20 @@ class enviroment(FiarGame):
         """
         returns a random action from the actionspace.
         """
-        return random.randint(0, self.action_space_n-1)
+        return random.randint(0, self.action_space_n - 1)
 
     def reward(self):
         reward = 0
-        if self.winner==0 and self.done==True:
+        if self.winner == 0 and self.done is True:
             reward = self.REWARD_TIE
-        if self.winner==1:
+        if self.winner == 1:
             reward = self.REWARD_WINNING
-        if self.winner==2:
+        if self.winner == 2:
             reward = self.REWARD_LOSING
         if self._invalid_move_played:
             reward = self.REWARD_INVALID_MOVE
 
         return reward
-       
 
     def step(self, action):
         """
@@ -59,21 +59,22 @@ class enviroment(FiarGame):
         """
         self.addCoin(action, self.active_player.player_id)
         self.CheckGameEnd()
-        
-        return self.GetState(), self.reward(), self.done, self.info()
-     
+
+        #return self.GetState(), self.reward(), self.done, self.info()
+        return self.playingField, self.reward(), self.done, self.info()
+
     def info(self):
-        dicti = {"active_player" : self.active_player.name,
-                 "moves_played" : self.turns}
+        dicti = {"active_player": self.active_player.name,
+                 "moves_played": self.turns}
         return dicti
-    
+
     def test(self, render=False):
-        observation, ep_reward, done = self.reset() , False, 0
+        observation, ep_reward, done = self.reset(), False, 0
 
         while not done:
             # action = self.sample()
             # action = self.active_player.select_cell(self.playingField)
-            action  = self.active_player.select_cell(board=self.playingField, state=self.GetState(), actionspace=self.GetActionSpace())
+            action = self.active_player.select_cell(board=self.playingField, state=self.GetState(), actionspace=self.GetActionSpace())
             observation, reward, done, info = self.step(action)
 
             if not self._invalid_move_played:
