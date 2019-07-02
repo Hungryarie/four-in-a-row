@@ -42,7 +42,7 @@ def trainNN():
     for episode in tqdm(range(1, EPISODES + 1), ascii=True, unit='episodes'):
 
         # Update tensorboard step every episode
-        p1.tensorboard.step = episode
+        env.player1.tensorboard.step = episode
 
         # Restarting episode - reset episode reward and step number
         episode_reward = 0
@@ -56,10 +56,10 @@ def trainNN():
         while not done:
 
             if env.current_player == 1:
-                # This part stays mostly the same, the change is to query a model for Q values
+                # Get action
                 if np.random.random() > epsilon:
-                    # Get action from Q table
-                    action = np.argmax(p1.get_qs(current_state))
+                    # Get action from model
+                    action = np.argmax(env.player1.get_qs(current_state))
                 else:
                     # Get random action
                     action = np.random.randint(0, env.action_space_n)
@@ -67,14 +67,17 @@ def trainNN():
                 new_state, reward, done, _ = env.step(action)
 
                 # Every step we update replay memory and train main network
-                p1.update_replay_memory((current_state, action, reward, new_state, done))
-                p1.train(done, step)
+                env.player1.update_replay_memory((current_state, action, reward, new_state, done))
+                env.player1.train(done, step)
 
                 current_state = new_state
                 step += 1
             else:
                 action = env.active_player.select_cell(board=env.playingField, state=env.GetState(), actionspace=env.GetActionSpace())
                 current_state, reward, done, _ = env.step(action)
+
+            if not env._invalid_move_played:
+                env.setNextPlayer()
 
             # Transform new continous state to new discrete state and count reward
             episode_reward += reward
@@ -88,18 +91,18 @@ def trainNN():
             average_reward = sum(ep_rewards[-AGGREGATE_STATS_EVERY:]) / len(ep_rewards[-AGGREGATE_STATS_EVERY:])
             min_reward = min(ep_rewards[-AGGREGATE_STATS_EVERY:])
             max_reward = max(ep_rewards[-AGGREGATE_STATS_EVERY:])
-            p1.tensorboard.update_stats(reward_avg=average_reward, reward_min=min_reward, reward_max=max_reward, epsilon=epsilon)
+            env.player1.tensorboard.update_stats(reward_avg=average_reward, reward_min=min_reward, reward_max=max_reward, epsilon=epsilon)
 
             # Save model, but only when min reward is greater or equal a set value
             if min_reward >= MIN_REWARD:
-                p1.model.save(f'models/{MODEL_NAME}__{max_reward:_>7.2f}max_{average_reward:_>7.2f}avg_{min_reward:_>7.2f}min__{int(time.time())}.model')
+                env.player1.model.save(f'models/{MODEL_NAME}__{max_reward:_>7.2f}max_{average_reward:_>7.2f}avg_{min_reward:_>7.2f}min__{int(time.time())}.model')
 
         # Decay epsilon
         if epsilon > MIN_EPSILON:
             epsilon *= EPSILON_DECAY
             epsilon = max(MIN_EPSILON, epsilon)
 
-    env.test()
+    env.player1.model.save(f'models/{MODEL_NAME}_endtraining__{max_reward:_>7.2f}max_{average_reward:_>7.2f}avg_{min_reward:_>7.2f}min__{int(time.time())}.model')
 
 
 def PlayInEnv():
