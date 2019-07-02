@@ -147,7 +147,7 @@ class DDQNPlayer(Player):
             self.target_update_counter = 0  # reset
 
     def get_qs(self, state):
-            # Queries main network for Q values given current observation space (environment state)
+        # Queries main network for Q values given current observation space (environment state)
         # So this is just doing a .predict(). We do the reshape because TensorFlow wants that exact explicit way to shape. The -1 just means a variable amount of this data will/could be fed through.
         # divided by 255 is to normalize is.
         # normilize function instead of /255 do: /2
