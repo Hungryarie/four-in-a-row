@@ -15,6 +15,8 @@ class enviroment(FiarGame):
         super().__init__(*args)
         #self.observation_space = self.GetObservationSpace()
         self.observation_space_n = self.GetObservationSize()
+        self.observation_max = 2
+        self.observation_min = 0
         self.action_space = self.GetActionSpace()
         self.action_space_n = self.GetActionSize()
 
