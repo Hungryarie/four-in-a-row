@@ -3,10 +3,10 @@ import random
 
 
 class FiarGame:
-    REWARD_WINNING = 10
+    REWARD_WINNING = 20  # 10
     REWARD_LOSING = -10
-    REWARD_TIE = -5
-    REWARD_INVALID_MOVE = -2
+    REWARD_TIE = -5  #
+    REWARD_INVALID_MOVE = -0.5  # 2
 
     def __init__(self, player1, player2):
 
@@ -121,7 +121,7 @@ class FiarGame:
 
     def checkFull(self):
         if self.turns >= self.rows * self.columns:
-            print("a draw!!!!")
+            # print("a draw!!!!")
             self.winnerhow = "draw / tie"
             return True
             #self.reset()
@@ -218,7 +218,7 @@ class FiarGame:
                     # print (f"row {self.rows-i} is already filled with {self.playingField[self.rows-i, inColumn]}")
                     i += 1
             except:
-                print(f"column {inColumn} is already totally filled")
+                # print(f"column {inColumn} is already totally filled")
                 self._invalid_move_played = True
                 return False
 
