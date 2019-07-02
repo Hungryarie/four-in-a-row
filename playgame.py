@@ -55,28 +55,32 @@ def trainNN():
         done = False
         while not done:
 
-            # This part stays mostly the same, the change is to query a model for Q values
-            if np.random.random() > epsilon:
-                # Get action from Q table
-                action = np.argmax(p1.get_qs(current_state))
-            else:
-                # Get random action
-                action = np.random.randint(0, env.action_space_n)
+            if env.current_player == 1:
+                # This part stays mostly the same, the change is to query a model for Q values
+                if np.random.random() > epsilon:
+                    # Get action from Q table
+                    action = np.argmax(p1.get_qs(current_state))
+                else:
+                    # Get random action
+                    action = np.random.randint(0, env.action_space_n)
 
-            new_state, reward, done, _ = env.step(action)
+                new_state, reward, done, _ = env.step(action)
+
+                # Every step we update replay memory and train main network
+                p1.update_replay_memory((current_state, action, reward, new_state, done))
+                p1.train(done, step)
+
+                current_state = new_state
+                step += 1
+            else:
+                action = env.active_player.select_cell(board=env.playingField, state=env.GetState(), actionspace=env.GetActionSpace())
+                current_state, reward, done, _ = env.step(action)
 
             # Transform new continous state to new discrete state and count reward
             episode_reward += reward
 
             if SHOW_PREVIEW and not episode % AGGREGATE_STATS_EVERY:
                 env.render()
-
-            # Every step we update replay memory and train main network
-            p1.update_replay_memory((current_state, action, reward, new_state, done))
-            p1.train(done, step)
-
-            current_state = new_state
-            step += 1
 
         # Append episode reward to a list and log stats (every given number of episodes)
         ep_rewards.append(episode_reward)
