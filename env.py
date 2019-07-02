@@ -11,9 +11,9 @@ from game import FiarGame
 
 class enviroment(FiarGame):
     def __init__(self, *args):
-        #FiarGame.__init__(self, *args)
+        # FiarGame.__init__(self, *args)
         super().__init__(*args)
-        #self.observation_space = self.GetObservationSpace()
+        # self.observation_space = self.GetObservationSpace()
         self.observation_space_n = self.GetObservationSize()
         self.observation_max = 2
         self.observation_min = 0
@@ -26,7 +26,7 @@ class enviroment(FiarGame):
         returns the observationspace / state, reward, done, info
         """
         super().reset()
-        #return self.GetState() #, 0, False, None
+        # return self.GetState() #, 0, False, None
         return self.playingField
 
     def render(self):
@@ -42,7 +42,7 @@ class enviroment(FiarGame):
         return random.randint(0, self.action_space_n - 1)
 
     def reward(self):
-        reward = 0
+        reward = -0.5
         if self.winner == 0 and self.done is True:
             reward = self.REWARD_TIE
         if self.winner == 1:
