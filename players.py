@@ -102,13 +102,13 @@ class DDQNPlayer(Player):
 
         # Get current states from minibatch, then query NN model for Q values
         # 2do: normilize function instead of /255
-        current_states = np.array([transition[0] for transition in minibatch]) / 255  # transition:(observation space, action, reward, new observation space, done)
+        current_states = np.array([transition[0] for transition in minibatch]) / 2  # 55  # transition:(observation space, action, reward, new observation space, done)
         current_qs_list = self.model.predict(current_states)
 
         # Get future states from minibatch, then query NN model for Q values
         # When using target network, query it, otherwise main network should be queried
         # 2do: normilize function instead of /255
-        new_current_states = np.array([transition[3] for transition in minibatch]) / 255  # transition:(observation space, action, reward, new observation space, done)
+        new_current_states = np.array([transition[3] for transition in minibatch]) / 2  # 55  # transition:(observation space, action, reward, new observation space, done)
         future_qs_list = self.target_model.predict(new_current_states)
 
         X = []
@@ -134,8 +134,8 @@ class DDQNPlayer(Player):
             y.append(current_qs)    # labels = actions
 
         # Fit on all samples as one batch, log only on terminal state
-        # 2do: normilize function instead of /255
-        self.model.fit(np.array(X) / 255, np.array(y), batch_size=MINIBATCH_SIZE, verbose=0, shuffle=False, callbacks=[self.tensorboard] if terminal_state else None)
+        # normilize function instead of /255 do: /2
+        self.model.fit(np.array(X) / 2, np.array(y), batch_size=MINIBATCH_SIZE, verbose=0, shuffle=False, callbacks=[self.tensorboard] if terminal_state else None)
 
         # Update target network counter every episode
         if terminal_state:
@@ -150,8 +150,8 @@ class DDQNPlayer(Player):
             # Queries main network for Q values given current observation space (environment state)
         # So this is just doing a .predict(). We do the reshape because TensorFlow wants that exact explicit way to shape. The -1 just means a variable amount of this data will/could be fed through.
         # divided by 255 is to normalize is.
-        # 2do: write own normalize method
-        return self.model.predict(np.array(state).reshape(-1, *state.shape) / 255)[0]
+        # normilize function instead of /255 do: /2
+        return self.model.predict(np.array(state).reshape(-1, *state.shape) / 2)[0]
 
 
 class DQNPlayer(Player):
@@ -169,13 +169,13 @@ class DQNPlayer(Player):
             # define separate losses for policy logits and value estimate
             loss=[self._logits_loss, self._value_loss]
         )
-        ##input_shape = (6,)
-        ##self.model.build(input_shape)
+        # #input_shape = (6,)
+        # #self.model.build(input_shape)
         # summarize layers
-        ##print(model.summary())
+        # #print(model.summary())
         # plot graph
         plot_model(model, to_file='modela2ca.png')
-    
+
     def train(self, env, batch_sz=32, updates=1000):
         # storage helpers for a single batch of data
         actions = np.empty((batch_sz,), dtype=np.int32)
@@ -194,7 +194,7 @@ class DQNPlayer(Player):
                 if dones[step]:
                     ep_rews.append(0.0)
                     next_obs = env.reset()
-                    logging.info("Episode: %03d, Reward: %03d" % (len(ep_rews)-1, ep_rews[-2]))
+                    logging.info("Episode: %03d, Reward: %03d" % (len(ep_rews) - 1, ep_rews[-2]))
 
             _, next_value = self.model.action_value(next_obs[None, :])
             returns, advs = self._returns_advantages(rewards, dones, values, next_value)
@@ -203,7 +203,7 @@ class DQNPlayer(Player):
             # performs a full training step on the collected batch
             # note: no need to mess around with gradients, Keras API handles it
             losses = self.model.train_on_batch(observations, [acts_and_advs, returns])
-            logging.debug("[%d/%d] Losses: %s" % (update+1, updates, losses))
+            logging.debug("[%d/%d] Losses: %s" % (update + 1, updates, losses))
         return ep_rews
 
     def select_cell(self, board, state, actionspace, **kwargs):
@@ -227,15 +227,15 @@ class DQNPlayer(Player):
         returns = np.append(np.zeros_like(rewards), next_value, axis=-1)
         # returns are calculated as discounted sum of future rewards
         for t in reversed(range(rewards.shape[0])):
-            returns[t] = rewards[t] + self.params['gamma'] * returns[t+1] * (1-dones[t])
+            returns[t] = rewards[t] + self.params['gamma'] * returns[t + 1] * (1 - dones[t])
         returns = returns[:-1]
         # advantages are returns - baseline, value estimates in our case
         advantages = returns - values
         return returns, advantages
-    
+
     def _value_loss(self, returns, value):
         # value loss is typically MSE between value estimates and returns
-        return self.params['value']*kls.mean_squared_error(returns, value)
+        return self.params['value'] * kls.mean_squared_error(returns, value)
 
     def _logits_loss(self, acts_and_advs, logits):
         # a trick to input actions and advantages through same API
@@ -250,7 +250,7 @@ class DQNPlayer(Player):
         # entropy loss can be calculated via CE over itself
         entropy_loss = kls.categorical_crossentropy(logits, logits, from_logits=True)
         # here signs are flipped because optimizer minimizes
-        return policy_loss - self.params['entropy']*entropy_loss
+        return policy_loss - self.params['entropy'] * entropy_loss
 
 
 class QPlayer(Player):
@@ -271,10 +271,10 @@ class QPlayer(Player):
         :param maximize_entropy: boolean, should the network try to maximize entropy over direct future rewards
         :param var_scope_name: the variable scope to use for the player
         """
-        layers_size = [item for sublist in [[9],hidden_layers_size,[9]] for item in sublist]
+        layers_size = [item for sublist in [[9], hidden_layers_size, [9]] for item in sublist]
         self.session = session
         self.model = DeepQNetworkModel(session=self.session, layers_size=layers_size,
-                                       memory=ExperienceReplayMemory(memory_size),default_batch_size=learning_batch_size,
+                                       memory=ExperienceReplayMemory(memory_size), default_batch_size=learning_batch_size,
                                        gamma=gamma, double_dqn=True,
                                        learning_procedures_to_q_target_switch=batches_to_q_target_switch,
                                        tau=tau, maximize_entropy=maximize_entropy, var_scope_name=var_scope_name)
