@@ -1,4 +1,4 @@
-import numpy as np 
+import numpy as np
 import random
 import matplotlib.pyplot as plt
 import players
@@ -38,6 +38,12 @@ def trainNN():
     p2.name = "Drunk Henk"
     env = enviroment(p1, p2)
 
+    #for stats
+    win_count = 0
+    loose_count = 0
+    draw_count = 0
+    invalidmove_count = 0
+
     # Iterate over episodes
     for episode in tqdm(range(1, EPISODES + 1), ascii=True, unit='episodes'):
 
@@ -70,6 +76,9 @@ def trainNN():
                 env.player1.update_replay_memory((current_state, action, reward, new_state, done))
                 env.player1.train(done, step)
 
+                if env._invalid_move_played:
+                    invalidmove_count += 1
+
                 current_state = new_state
                 step += 1
             else:
@@ -85,16 +94,32 @@ def trainNN():
             if SHOW_PREVIEW and not episode % AGGREGATE_STATS_EVERY:
                 env.render()
 
+        if env.winner == env.player1.player_id:
+            win_count += 1
+
+        elif env.winner == env.player2.player_id:
+            loose_count += 1
+        else:
+            draw_count += 1
+
         # Append episode reward to a list and log stats (every given number of episodes)
         ep_rewards.append(episode_reward)
         if not episode % AGGREGATE_STATS_EVERY or episode == 1:
+
             average_reward = sum(ep_rewards[-AGGREGATE_STATS_EVERY:]) / len(ep_rewards[-AGGREGATE_STATS_EVERY:])
             min_reward = min(ep_rewards[-AGGREGATE_STATS_EVERY:])
             max_reward = max(ep_rewards[-AGGREGATE_STATS_EVERY:])
-            env.player1.tensorboard.update_stats(reward_avg=average_reward, reward_min=min_reward, reward_max=max_reward, epsilon=epsilon)
+            env.player1.tensorboard.update_stats(reward_avg=average_reward, reward_min=min_reward, reward_max=max_reward, epsilon=epsilon,
+                                                 win_count=win_count, loose_count=loose_count, draw_count=draw_count, invalidmove_count=invalidmove_count)
 
-            # Save model, but only when min reward is greater or equal a set value
-            if min_reward >= MIN_REWARD:
+            # reset stats
+            win_count = 0
+            loose_count = 0
+            draw_count = 0
+            invalidmove_count = 0
+
+            # Save model, but only when avg reward is greater or equal a set value
+            if average_reward >= MIN_REWARD:
                 env.player1.model.save(f'models/{MODEL_NAME}__{max_reward:_>7.2f}max_{average_reward:_>7.2f}avg_{min_reward:_>7.2f}min__{int(time.time())}.model')
 
         # Decay epsilon
@@ -119,7 +144,7 @@ def PlayInEnv():
         observation, *_ = env.reset()
         # print (observation)
         rew = env.test(render=False)
-        
+
         rewards_history.append(rew)
         print(f"Episode {i_episode} finished with rewardpoints: {rew}")
 
@@ -146,11 +171,11 @@ def playAgainstRandom():
     print(f"the game of '{Game.player1.name}' vs '{Game.player2.name}'")
 
     while not Game.done:
-        #print (f"{Game.opponentColor}:{Game.opponentName}'s turn")
-        #print (f"cell random:{Game.active_player.select_cell(Game.playingField)}")
+        # print (f"{Game.opponentColor}:{Game.opponentName}'s turn")
+        # print (f"cell random:{Game.active_player.select_cell(Game.playingField)}")
         print(f"> Turn: {Game.active_player.name} ({Game.active_player.color})")
-        
-        ColumnNo = Game.active_player.select_cell(board=Game.playingField, state=Game.GetState(), actionspace=Game.GetActionSpace())  #random.randint(0,Game.columns-1)
+
+        ColumnNo = Game.active_player.select_cell(board=Game.playingField, state=Game.GetState(), actionspace=Game.GetActionSpace())  # random.randint(0,Game.columns-1)
 
         if Game.addCoin(ColumnNo, Game.current_player):
             Game.ShowField2()
