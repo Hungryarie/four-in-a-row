@@ -9,7 +9,8 @@ How to play:
 
 what works:
 - playing against a dump computer (plays random)
+- training pipeline for DDQN reinforcement learning model
 
 
 work to be done:
-- training a reinforcement learning model
+- optimizing the reinforcement learning model
