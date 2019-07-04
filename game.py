@@ -6,7 +6,7 @@ class FiarGame:
     REWARD_WINNING = 20  # 10
     REWARD_LOSING = -10
     REWARD_TIE = -5  #
-    REWARD_INVALID_MOVE = -0.5  # 2
+    REWARD_INVALID_MOVE = -0.5  # -2
 
     def __init__(self, player1, player2):
 
@@ -25,6 +25,7 @@ class FiarGame:
     
     def reset(self):
         self.playingField = np.zeros([self.rows, self.columns], dtype=int)
+        self.playingField = self.playingField[:, :, np.newaxis]
         self.winner = 0                       # winner id. 0 is no winner yet
         self.winnerhow = "none"
         self.done = False
@@ -154,7 +155,7 @@ class FiarGame:
     @staticmethod
     def NProtate45(array):
         # Rotate numpy array 45 degrees
-        rows, cols = array.shape
+        rows, cols, _ = array.shape
         rot = np.zeros([rows, cols + rows - 1], dtype=int)
         for i in range(rows):
             for j in range(cols):
@@ -164,7 +165,7 @@ class FiarGame:
     @staticmethod
     def NProtate275(array):
         # Rotate numpy array 275 degrees
-        rows, cols = array.shape
+        rows, cols, _ = array.shape
         rot = np.zeros([rows, cols + rows - 1], dtype=int)
         for i in range(rows):
             for j in range(cols):
