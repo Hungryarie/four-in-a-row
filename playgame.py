@@ -5,7 +5,7 @@ import players
 from game import FiarGame
 from env import enviroment
 #
-from model import model_1, model_2
+from model import ModelLog, model_1, model_2
 from tqdm import tqdm
 from constants import *
 import os
@@ -19,7 +19,6 @@ SHOW_EVERY = 50
 def trainNN():
     # For stats
     ep_rewards = [-20]
-
     epsilon = 1
 
     # For more repetitive results
@@ -31,14 +30,18 @@ def trainNN():
     if not os.path.isdir('models'):
         os.makedirs('models')
 
-    Model = model_2(input_shape=(6, 7), output_num=7)  # (7, 6, 1)(1, 42)
+    Model = model_1(input_shape=(6, 7, 1), output_num=7)  # (7, 6, 1)(1, 42)
     p1 = players.DDQNPlayer(Model)
     p2 = players.Drunk()
     p1.name = "DDQN"
     p2.name = "Drunk Henk"
     env = enviroment(p1, p2)
-
+    
     #for stats
+    log = ModelLog()
+    log.add_model_info(Model)
+    log.add_constants()
+    log.write_to_file('parameters2.log')
     win_count = 0
     loose_count = 0
     draw_count = 0
@@ -105,12 +108,13 @@ def trainNN():
         # Append episode reward to a list and log stats (every given number of episodes)
         ep_rewards.append(episode_reward)
         if not episode % AGGREGATE_STATS_EVERY or episode == 1:
-
+            win_ratio = win_count / (win_count + loose_count)
             average_reward = sum(ep_rewards[-AGGREGATE_STATS_EVERY:]) / len(ep_rewards[-AGGREGATE_STATS_EVERY:])
             min_reward = min(ep_rewards[-AGGREGATE_STATS_EVERY:])
             max_reward = max(ep_rewards[-AGGREGATE_STATS_EVERY:])
             env.player1.tensorboard.update_stats(reward_avg=average_reward, reward_min=min_reward, reward_max=max_reward, epsilon=epsilon,
-                                                 win_count=win_count, loose_count=loose_count, draw_count=draw_count, invalidmove_count=invalidmove_count)
+                                                 win_count=win_count, loose_count=loose_count, draw_count=draw_count, invalidmove_count=invalidmove_count,
+                                                 win_ratio=win_ratio)
 
             # reset stats
             win_count = 0
@@ -120,14 +124,14 @@ def trainNN():
 
             # Save model, but only when avg reward is greater or equal a set value
             if average_reward >= MIN_REWARD:
-                env.player1.model.save(f'models/{MODEL_NAME}__{max_reward:_>7.2f}max_{average_reward:_>7.2f}avg_{min_reward:_>7.2f}min__{int(time.time())}.model')
+                env.player1.model.save(f'models/{log.model_name}_startstamp:{log.model_timestamp}_episode:{episode}_{max_reward:_>7.2f}max_{average_reward:_>7.2f}avg_{min_reward:_>7.2f}min__{int(time.time())}.model')
 
         # Decay epsilon
         if epsilon > MIN_EPSILON:
             epsilon *= EPSILON_DECAY
             epsilon = max(MIN_EPSILON, epsilon)
 
-    env.player1.model.save(f'models/{MODEL_NAME}_endtraining__{max_reward:_>7.2f}max_{average_reward:_>7.2f}avg_{min_reward:_>7.2f}min__{int(time.time())}.model')
+    env.player1.model.save(f'models/{log.model_name}_startstamp:{log.model_timestamp}_endtraining__{max_reward:_>7.2f}max_{average_reward:_>7.2f}avg_{min_reward:_>7.2f}min__{int(time.time())}.model')
 
 
 def PlayInEnv():
