@@ -74,13 +74,11 @@ class DDQNPlayer(Player):
         self.target_model = model.target_model  # self.create_model(input_shape=(10, 10, 3), output_num=9)
         self.target_model.set_weights(self.model.get_weights())
 
-        print(f"model:{self.model}, target_model:{self.target_model}")
-
         # An array with last n steps for training
         self.replay_memory = deque(maxlen=REPLAY_MEMORY_SIZE)
 
         # Custom tensorboard object
-        self.tensorboard = ModifiedTensorBoard(log_dir="logs/{}-{}".format(MODEL_NAME, int(time.time())))
+        self.tensorboard = ModifiedTensorBoard(log_dir=f"logs/{model.model_name}-{int(time.time())}")
 
         # Used to count when to update target network with main network's weights
         self.target_update_counter = 0
@@ -146,12 +144,21 @@ class DDQNPlayer(Player):
             self.target_model.set_weights(self.model.get_weights())
             self.target_update_counter = 0  # reset
 
+    def get_prob_action(self, state):
+        #2do:
+        prop_out_list = self.get_qs(state)
+        #random.random()
+
     def get_qs(self, state):
         # Queries main network for Q values given current observation space (environment state)
         # So this is just doing a .predict(). We do the reshape because TensorFlow wants that exact explicit way to shape. The -1 just means a variable amount of this data will/could be fed through.
         # divided by 255 is to normalize is.
         # normilize function instead of /255 do: /2
         return self.model.predict(np.array(state).reshape(-1, *state.shape) / 2)[0]
+
+    def select_cell(self, board, state, actionspace, **kwargs):
+        action = np.argmax(self.get_qs(state))
+        return action
 
 
 class DQNPlayer(Player):
