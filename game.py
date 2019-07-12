@@ -1,4 +1,4 @@
-import numpy as np 
+import numpy as np
 import random
 
 
@@ -7,6 +7,7 @@ class FiarGame:
     REWARD_LOSING = -10
     REWARD_TIE = -5  #
     REWARD_INVALID_MOVE = -0.5  # -2
+    REWARD_STEP = -0.5
 
     def __init__(self, player1, player2):
 
@@ -22,7 +23,7 @@ class FiarGame:
         self.player2.player_id = 2
 
         self.reset()
-    
+
     def reset(self):
         self.playingField = np.zeros([self.rows, self.columns], dtype=int)
         self.playingField = self.playingField[:, :, np.newaxis]
@@ -31,7 +32,7 @@ class FiarGame:
         self.done = False
         self.turns = 0                       # amount of tries before winning
         self.nextTurn = random.randint(1, 2)   # random pick a player to start
-        self.current_player = random.randint(1,2)   # random pick a player to start
+        self.current_player = random.randint(1, 2)   # random pick a player to start
         self._invalid_move_played = False
 
     @property
@@ -50,7 +51,7 @@ class FiarGame:
 
     def setNextPlayer(self):
         # Set the next turn
-        #print (f"current player={self.nextTurn}. next = {abs(self.nextTurn -2)+1}")
+        # print (f"current player={self.nextTurn}. next = {abs(self.nextTurn -2)+1}")
         self.nextTurn = abs(self.nextTurn - 2) + 1
         self.current_player = abs(self.current_player - 2) + 1
 
@@ -71,7 +72,7 @@ class FiarGame:
     def GetState(self):
         flatStateArray = self.playingField.flatten()
         return flatStateArray
-    
+
     def GetObservationSize(self):
         return len(self.GetState())
 
@@ -116,7 +117,7 @@ class FiarGame:
         if self.checkFull():
             # check for a tie / draw
             self.done = True
-        #print(self.Winnerinfo())
+        # print(self.Winnerinfo())
 
         return self.done
 
@@ -144,10 +145,10 @@ class FiarGame:
         if sum(np.apply_along_axis( self.checkFourOnARow, axis=1, arr=self.playingField ))==WhosTurn:
             return True
         else:
-            return False 
+            return False
         """
         return sum(np.apply_along_axis(self.checkFourOnARow, axis=1, arr=self.playingField))      
-        
+
     def checkForWinnerVer(self):
         #print("Check for a Vertical Winner")
         return sum(np.apply_along_axis(self.checkFourOnARow, axis=0, arr=self.playingField))
@@ -226,7 +227,7 @@ class FiarGame:
     def ShowField(self):
         print(" |0|1|2|3|4|5|6| << colums")
         print(self.playingField)
-    
+
     def ShowField2(self):
         print("|0|1|2|3|4|5|6| << colums")
         for i in self.playingField:
