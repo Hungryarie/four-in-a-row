@@ -5,7 +5,7 @@ import players
 from game import FiarGame
 from env import enviroment
 #
-from model import ModelLog, model_1, model_2
+from model import ModelLog, load_a_model, model_1, model_2, model_3
 from tqdm import tqdm
 from constants import *
 import os
@@ -30,13 +30,15 @@ def trainNN():
     if not os.path.isdir('models'):
         os.makedirs('models')
 
-    Model = model_1(input_shape=(6, 7, 1), output_num=7)  # (7, 6, 1)(1, 42)
+    #Model = model_3(input_shape=(6, 7, 1), output_num=7)  # (7, 6, 1)(1, 42)
+    Model = load_a_model('models/model3_dense2x64_startstamp1562872160_episode6950___17.00max____7.31avg__-24.00min__1562873371.model')
     p1 = players.DDQNPlayer(Model)
     p2 = players.Drunk()
     p1.name = "DDQN"
     p2.name = "Drunk Henk"
     env = enviroment(p1, p2)
-    
+
+
     #for stats
     log = ModelLog()
     log.add_model_info(Model)
@@ -47,6 +49,7 @@ def trainNN():
     draw_count = 0
     invalidmove_count = 0
 
+    env.player1.setup_for_training()
     # Iterate over episodes
     for episode in tqdm(range(1, EPISODES + 1), ascii=True, unit='episodes'):
 
@@ -124,37 +127,56 @@ def trainNN():
 
             # Save model, but only when avg reward is greater or equal a set value
             if average_reward >= MIN_REWARD:
-                env.player1.model.save(f'models/{log.model_name}_startstamp:{log.model_timestamp}_episode:{episode}_{max_reward:_>7.2f}max_{average_reward:_>7.2f}avg_{min_reward:_>7.2f}min__{int(time.time())}.model')
+                env.player1.model.save(f'models/{log.model_name}_startstamp{log.model_timestamp}_episode{episode}_{max_reward:_>7.2f}max_{average_reward:_>7.2f}avg_{min_reward:_>7.2f}min__{int(time.time())}.model')
 
         # Decay epsilon
         if epsilon > MIN_EPSILON:
             epsilon *= EPSILON_DECAY
             epsilon = max(MIN_EPSILON, epsilon)
 
-    env.player1.model.save(f'models/{log.model_name}_startstamp:{log.model_timestamp}_endtraining__{max_reward:_>7.2f}max_{average_reward:_>7.2f}avg_{min_reward:_>7.2f}min__{int(time.time())}.model')
+    env.player1.model.save(f'models/{log.model_name}_startstamp{log.model_timestamp}_endtraining__{max_reward:_>7.2f}max_{average_reward:_>7.2f}avg_{min_reward:_>7.2f}min__{int(time.time())}.model')
 
 
 def PlayInEnv():
+    Model = load_a_model('models/model3_dense2x64_startstamp1562872160_episode6950___17.00max____7.31avg__-24.00min__1562873371.model')
+    p2 = players.DDQNPlayer(Model)
+    p1 = players.Human()
 
-    p1 = players.Drunk()
-    p2 = players.Drunk()
+    p2.name = "DDQN"
     p1.name = "Arnoud"
-    p2.name = "Henk"
     env = enviroment(p1, p2)
+    env.env_info()
+
+    rew = env.test(render=True)
+    print(f"reward: {rew}")
+    print(env.Winnerinfo())
+
+
+def TestInEnv():
+    Model = load_a_model('models/model3_dense2x64_startstamp1562872160_episode6950___17.00max____7.31avg__-24.00min__1562873371.model')
+    p1 = players.DDQNPlayer(Model)
+    #p1 = players.Drunk()
+    p2 = players.Drunk()
+
+    p1.name = "DDQN"
+    p2.name = "drunken henk"
+    env = enviroment(p1, p2)
+    env.env_info()
 
     print("evaluate Training...")
     rewards_history = []
-    for i_episode in range(101):
+    for i_episode in range(201):
         observation, *_ = env.reset()
         # print (observation)
         rew = env.test(render=False)
 
         rewards_history.append(rew)
-        print(f"Episode {i_episode} finished with rewardpoints: {rew}")
+        #print(f"Episode {i_episode} finished with rewardpoints: {rew}")
 
         if i_episode % SHOW_EVERY == 0:
             print(f"{SHOW_EVERY} ep mean: {np.mean(rewards_history[-SHOW_EVERY:])}")
 
+    print(f"{i_episode} ep mean (total): {np.mean(rewards_history[:])}")
     plt.style.use('seaborn')
     plt.plot(0, len(rewards_history), rewards_history)
     plt.xlabel('Episode')
@@ -191,5 +213,6 @@ def playAgainstRandom():
 
 if __name__ == '__main__':
     #playAgainstRandom()
+    #TestInEnv()
     #PlayInEnv()
     trainNN()
