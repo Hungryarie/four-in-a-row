@@ -39,9 +39,9 @@ class ModelLog():
             "EPSILON_DECAY": EPSILON_DECAY,
             "MIN_EPSILON": MIN_EPSILON,
             "AGGREGATE_STATS_EVERY": AGGREGATE_STATS_EVERY,
-            "SHOW_PREVIEW": SHOW_PREVIEW,
-            "LOAD_MODEL": LOAD_MODEL
+            "SHOW_PREVIEW": SHOW_PREVIEW
         }
+        # "LOAD_MODEL": LOAD_MODEL
 
     def write_to_file(self, path):
         f = open(path, "a+")
@@ -85,10 +85,13 @@ class ModifiedTensorBoard(TensorBoard):
         self._write_logs(stats, self.step)
 
 
-#class load_a_model:
-#    def __init__(self, path):
-#        self.model = load_model(path)
-#        self.target_model = load_model(path)
+class load_a_model:
+    def __init__(self, path):
+        self.model = load_model(path)
+        self.target_model = load_model(path)
+        old_modelname = path.split('_')
+        self.model_name = f'PreLoadedModel_{old_modelname[0]}_{old_modelname[1]}'
+        self.timestamp = int(time.time())
 
 
 class model_1:
@@ -99,28 +102,23 @@ class model_1:
         self.timestamp = int(time.time())
 
     def create_model(self, input_shape, output_num):
-        if LOAD_MODEL is not None:
-            print(f"loading model: {LOAD_MODEL}")
-            model = load_model(LOAD_MODEL)
-            print("model loaded")
-        else:
-            model = Sequential()
+        model = Sequential()
 
-            model.add(Conv2D(128, (3, 3), input_shape=input_shape, data_format="channels_last", padding='same'))  # OBSERVATION_SPACE_VALUES = (10, 10, 3) a 10x10 RGB image.
-            model.add(Activation('relu'))
-            #model.add(MaxPooling2D(pool_size=(2, 2)))
-            model.add(Dropout(0.2))
+        model.add(Conv2D(128, (3, 3), input_shape=input_shape, data_format="channels_last", padding='same'))  # OBSERVATION_SPACE_VALUES = (10, 10, 3) a 10x10 RGB image.
+        model.add(Activation('relu'))
+        #model.add(MaxPooling2D(pool_size=(2, 2)))
+        #model.add(Dropout(0.2))
 
-            model.add(Conv2D(128, (3, 3), padding='same'))
-            model.add(Activation('relu'))
-            #model.add(MaxPooling2D(pool_size=(2, 2)))
-            model.add(Dropout(0.2))
+        model.add(Conv2D(128, (3, 3), padding='same'))
+        model.add(Activation('relu'))
+        #model.add(MaxPooling2D(pool_size=(2, 2)))
+        #model.add(Dropout(0.2))
 
-            model.add(Flatten())  # this converts our 3D feature maps to 1D feature vectors
-            model.add(Dense(64))
+        model.add(Flatten())  # this converts our 3D feature maps to 1D feature vectors
+        model.add(Dense(64))
 
-            model.add(Dense(output_num, activation='linear'))  # ACTION_SPACE_SIZE = how many choices (9)
-            model.compile(loss="mse", optimizer=Adam(lr=0.001), metrics=['accuracy'])
+        model.add(Dense(output_num, activation='linear'))  # ACTION_SPACE_SIZE = how many choices (9)
+        model.compile(loss="mse", optimizer=Adam(lr=0.001), metrics=['accuracy'])
         return model
 
 
@@ -132,20 +130,38 @@ class model_2:
         self.timestamp = int(time.time())
 
     def create_model(self, input_shape, output_num):
-        # just for testing a quicker model
-        if LOAD_MODEL is not None:
-            print(f"loading model: {LOAD_MODEL}")
-            model = load_model(LOAD_MODEL)
-            print("model loaded")
-        else:
-            model = Sequential()
+        model = Sequential()
 
-            model.add(Dense(64, input_shape=input_shape))
-            model.add(Activation('relu'))
+        model.add(Dense(64, input_shape=input_shape))
+        model.add(Activation('relu'))
 
-            model.add(Flatten())  # this converts our 3D feature maps to 1D feature vectors
-            # model.add(Dense(64))
+        model.add(Flatten())  # this converts our 3D feature maps to 1D feature vectors
+        # model.add(Dense(64))
 
-            model.add(Dense(output_num, activation='linear'))  # ACTION_SPACE_SIZE = how many choices (9)
-            model.compile(loss="mse", optimizer=Adam(lr=0.001), metrics=['accuracy'])
+        model.add(Dense(output_num, activation='linear'))  # ACTION_SPACE_SIZE = how many choices (9)
+        model.compile(loss="mse", optimizer=Adam(lr=0.001), metrics=['accuracy'])
+        return model
+
+
+class model_3:
+    def __init__(self, input_shape, output_num):
+        self.model = self.create_model(input_shape, output_num)
+        self.target_model = self.create_model(input_shape, output_num)
+        self.model_name = 'model3_dense2x64'
+        self.timestamp = int(time.time())
+
+    def create_model(self, input_shape, output_num):
+        model = Sequential()
+
+        model.add(Dense(64, input_shape=input_shape))
+        model.add(Activation('relu'))
+
+        model.add(Dense(64, input_shape=input_shape))
+        model.add(Activation('relu'))
+
+        model.add(Flatten())  # this converts our 3D feature maps to 1D feature vectors
+        # model.add(Dense(64))
+
+        model.add(Dense(output_num, activation='linear'))  # ACTION_SPACE_SIZE = how many choices (9)
+        model.compile(loss="mse", optimizer=Adam(lr=0.001), metrics=['accuracy'])
         return model
