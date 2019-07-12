@@ -2,7 +2,7 @@
 # https://github.com/jaromiru/AI-blog/blob/master/CartPole-DQN.py
 # https://github.com/keon/deep-q-learning/blob/master/ddqn.py
 
-import numpy as np 
+import numpy as np
 import random
 import matplotlib.pyplot as plt
 import players
@@ -22,7 +22,7 @@ class enviroment(FiarGame):
 
     def reset(self):
         """
-        resets the game and 
+        resets the game and
         returns the observationspace / state, reward, done, info
         """
         super().reset()
@@ -35,6 +35,10 @@ class enviroment(FiarGame):
         """
         self.ShowField2()
 
+    def env_info(self):
+        print(f"player 1:{self.player1.name}, coin:{self.player1.color}, type:{type(self.player1)}")
+        print(f"player 2:{self.player2.name}, coin:{self.player2.color}, type:{type(self.player2)}")
+
     def sample(self):
         """
         returns a random action from the actionspace.
@@ -42,7 +46,7 @@ class enviroment(FiarGame):
         return random.randint(0, self.action_space_n - 1)
 
     def reward(self):
-        reward = -0.5
+        reward = self.REWARD_STEP
         if self.winner == 0 and self.done is True:
             reward = self.REWARD_TIE
         if self.winner == 1:
@@ -62,7 +66,7 @@ class enviroment(FiarGame):
         self.addCoin(action, self.active_player.player_id)
         self.CheckGameEnd()
 
-        #return self.GetState(), self.reward(), self.done, self.info()
+        # return self.GetState(), self.reward(), self.done, self.info()
         return self.playingField, self.reward(), self.done, self.info()
 
     def info(self):
@@ -85,13 +89,13 @@ class enviroment(FiarGame):
 
             if render:
                 self.render()
-                #print(observation)
-                #print (f"reward: {reward}")
+                # print(observation)
+                # print (f"reward: {reward}")
 
             if done:
                 pass
-                #self.render()
-                #print(self.Winnerinfo())
-                #print(f"Episode finished after {self.turns} timesteps")
-                #print("\n")
+                # self.render()
+                # print(self.Winnerinfo())
+                # print(f"Episode finished after {self.turns} timesteps")
+                # print("\n")
         return ep_reward
