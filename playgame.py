@@ -5,7 +5,7 @@ import players
 from game import FiarGame
 from env import enviroment
 #
-from model import ModelLog, load_a_model, model_1, model_2, model_3
+from model import ModelLog, load_a_model, model_1, model_2, model_3, model_4
 from tqdm import tqdm
 from constants import *
 import os
@@ -30,8 +30,8 @@ def trainNN():
     if not os.path.isdir('models'):
         os.makedirs('models')
 
-    #Model = model_3(input_shape=(6, 7, 1), output_num=7)  # (7, 6, 1)(1, 42)
-    Model = load_a_model('models/model3_dense2x64_startstamp1562872160_episode6950___17.00max____7.31avg__-24.00min__1562873371.model')
+    Model = model_4(input_shape=(6, 7, 1), output_num=7)  # (7, 6, 1)(1, 42)
+    #Model = load_a_model('models/model3_dense2x64_startstamp1562872160_episode6950___17.00max____7.31avg__-24.00min__1562873371.model')
     p1 = players.DDQNPlayer(Model)
     p2 = players.Drunk()
     p1.name = "DDQN"
@@ -138,12 +138,12 @@ def trainNN():
 
 
 def PlayInEnv():
-    Model = load_a_model('models/model3_dense2x64_startstamp1562872160_episode6950___17.00max____7.31avg__-24.00min__1562873371.model')
-    p2 = players.DDQNPlayer(Model)
-    p1 = players.Human()
+    Model = load_a_model('models/model4_dense2x128(softmax)_startstamp1563220199_episode6200___17.00max___12.20avg__-17.00min__1563221449.model')
+    p1 = players.DDQNPlayer(Model)
+    p2 = players.Human()
 
-    p2.name = "DDQN"
-    p1.name = "Arnoud"
+    p1.name = "DDQN"
+    p2.name = "Arnoud"
     env = enviroment(p1, p2)
     env.env_info()
 
@@ -153,7 +153,7 @@ def PlayInEnv():
 
 
 def TestInEnv():
-    Model = load_a_model('models/model3_dense2x64_startstamp1562872160_episode6950___17.00max____7.31avg__-24.00min__1562873371.model')
+    Model = load_a_model('models\model4_dense2x128(softmax)_startstamp1563220199_episode6200___17.00max___12.20avg__-17.00min__1563221449.model')
     p1 = players.DDQNPlayer(Model)
     #p1 = players.Drunk()
     p2 = players.Drunk()
@@ -214,5 +214,5 @@ def playAgainstRandom():
 if __name__ == '__main__':
     #playAgainstRandom()
     #TestInEnv()
-    #PlayInEnv()
-    trainNN()
+    PlayInEnv()
+    #trainNN()

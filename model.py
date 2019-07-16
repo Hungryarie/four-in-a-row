@@ -89,8 +89,9 @@ class load_a_model:
     def __init__(self, path):
         self.model = load_model(path)
         self.target_model = load_model(path)
+        path = path[7:]  # removes subdir (models/)
         old_modelname = path.split('_')
-        self.model_name = f'PreLoadedModel_{old_modelname[0]}_{old_modelname[1]}'
+        self.model_name = f'PreLoadedModel_{old_modelname[0]}_{old_modelname[1]}_{old_modelname[2]}_{old_modelname[3]}'
         self.timestamp = int(time.time())
 
 
@@ -163,5 +164,31 @@ class model_3:
         # model.add(Dense(64))
 
         model.add(Dense(output_num, activation='linear'))  # ACTION_SPACE_SIZE = how many choices (9)
+        model.compile(loss="mse", optimizer=Adam(lr=0.001), metrics=['accuracy'])
+        return model
+
+
+class model_4:
+    def __init__(self, input_shape, output_num):
+        self.model = self.create_model(input_shape, output_num)
+        self.target_model = self.create_model(input_shape, output_num)
+        self.model_name = 'model4_dense2x128(softmax)'
+        self.timestamp = int(time.time())
+
+    def create_model(self, input_shape, output_num):
+        model = Sequential()
+
+        model.add(Dense(128, input_shape=input_shape))
+        model.add(Activation('relu'))
+
+        model.add(Dense(128, input_shape=input_shape))
+        model.add(Activation('relu'))
+
+        model.add(Flatten())  # this converts our 3D feature maps to 1D feature vectors
+        # model.add(Dense(64))
+        #model.add(Dense(128, input_shape=input_shape))
+        #model.add(Activation('relu'))
+
+        model.add(Dense(output_num, activation='softmax'))  # ACTION_SPACE_SIZE = how many choices (9)
         model.compile(loss="mse", optimizer=Adam(lr=0.001), metrics=['accuracy'])
         return model
