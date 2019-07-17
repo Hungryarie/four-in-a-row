@@ -83,7 +83,7 @@ def trainNN():
                 env.player1.train(done, step)
 
                 if env._invalid_move_played:
-                    invalidmove_count += 1
+                    invalidmove_count += 1  # tensorboard stats
 
                 current_state = new_state
                 step += 1
@@ -99,7 +99,8 @@ def trainNN():
 
             if SHOW_PREVIEW and not episode % AGGREGATE_STATS_EVERY:
                 env.render()
-
+                
+        # tensorboard stats
         if env.winner == env.player1.player_id:
             win_count += 1
 
