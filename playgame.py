@@ -31,9 +31,11 @@ def trainNN():
         os.makedirs('models')
 
     Model = model_4(input_shape=(6, 7, 1), output_num=7)  # (7, 6, 1)(1, 42)
-    #Model = load_a_model('models/model3_dense2x64_startstamp1562872160_episode6950___17.00max____7.31avg__-24.00min__1562873371.model')
+    #Model = load_a_model('models/model4_dense2x128(softmax)_startstamp1563220199_episode6200___17.00max___12.20avg__-17.00min__1563221449.model')
+    #Model2 = load_a_model('models/model4_dense2x128(softmax)_startstamp1563220199_episode6200___17.00max___12.20avg__-17.00min__1563221449.model')
     p1 = players.DDQNPlayer(Model)
     p2 = players.Drunk()
+    #p2 = players.DDQNPlayer(Model2)
     p1.name = "DDQN"
     p2.name = "Drunk Henk"
     env = enviroment(p1, p2)
@@ -67,14 +69,18 @@ def trainNN():
         done = False
         while not done:
 
+            env.block_invalid_moves(x=3)
+
             if env.current_player == 1:
                 # Get action
                 if np.random.random() > epsilon:
                     # Get action from model
-                    action = np.argmax(env.player1.get_qs(current_state))
+                    #action = np.argmax(env.player1.get_qs(current_state))
+                    action = env.active_player.select_cell(board=env.playingField, state=env.GetState(), actionspace=env.action_space)
                 else:
                     # Get random action
-                    action = np.random.randint(0, env.action_space_n)
+                    #action = np.random.randint(0, env.action_space_n)
+                    action = np.random.choice(env.action_space)
 
                 new_state, reward, done, _ = env.step(action)
 
@@ -88,8 +94,17 @@ def trainNN():
                 current_state = new_state
                 step += 1
             else:
-                action = env.active_player.select_cell(board=env.playingField, state=env.GetState(), actionspace=env.GetActionSpace())
-                current_state, reward, done, _ = env.step(action)
+                action = env.active_player.select_cell(board=env.playingField, state=env.GetState(), actionspace=env.action_space)
+                semicurrent_state, reward, done, _ = env.step(action)
+
+                if done:
+                    # train one final time when losing the game
+                    #print('LOST GAME: reward:{reward}, done:{done}')
+                    # Every step we update replay memory and train main network
+                    env.player1.update_replay_memory((current_state, action, reward, semicurrent_state, done))
+                    env.player1.train(done, step)
+
+                current_state = semicurrent_state
 
             if not env._invalid_move_played:
                 env.setNextPlayer()
@@ -99,11 +114,10 @@ def trainNN():
 
             if SHOW_PREVIEW and not episode % AGGREGATE_STATS_EVERY:
                 env.render()
-                
+
         # tensorboard stats
         if env.winner == env.player1.player_id:
-            win_count += 1
-
+            win_count += 1 
         elif env.winner == env.player2.player_id:
             loose_count += 1
         else:
@@ -143,6 +157,7 @@ def PlayInEnv():
     p1 = players.DDQNPlayer(Model)
     p2 = players.Human()
 
+
     p1.name = "DDQN"
     p2.name = "Arnoud"
     env = enviroment(p1, p2)
@@ -158,9 +173,10 @@ def TestInEnv():
     p1 = players.DDQNPlayer(Model)
     #p1 = players.Drunk()
     p2 = players.Drunk()
+    #p2 = players.DDQNPlayer(Model)
 
     p1.name = "DDQN"
-    p2.name = "drunken henk"
+    p2.name = "drunken"
     env = enviroment(p1, p2)
     env.env_info()
 
@@ -215,5 +231,5 @@ def playAgainstRandom():
 if __name__ == '__main__':
     #playAgainstRandom()
     #TestInEnv()
-    PlayInEnv()
-    #trainNN()
+    #PlayInEnv()
+    trainNN()
