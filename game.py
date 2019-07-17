@@ -6,7 +6,7 @@ class FiarGame:
     REWARD_WINNING = 20  # 10
     REWARD_LOSING = -10
     REWARD_TIE = -5  #
-    REWARD_INVALID_MOVE = -0.5  # -2
+    REWARD_INVALID_MOVE = -0.5 # -2
     REWARD_STEP = -0.5
 
     def __init__(self, player1, player2):
@@ -26,7 +26,7 @@ class FiarGame:
 
     def reset(self):
         self.playingField = np.zeros([self.rows, self.columns], dtype=int)
-        self.playingField = self.playingField[:, :, np.newaxis]
+        self.playingField = self.playingField[:, :, np.newaxis] 
         self.winner = 0                       # winner id. 0 is no winner yet
         self.winnerhow = "none"
         self.done = False
@@ -34,6 +34,8 @@ class FiarGame:
         self.nextTurn = random.randint(1, 2)   # random pick a player to start
         self.current_player = random.randint(1, 2)   # random pick a player to start
         self._invalid_move_played = False
+        self._invalid_move_count = 0
+        self._invalid_move_action = False
 
     @property
     def active_player(self):
@@ -207,14 +209,19 @@ class FiarGame:
         if inColumn >= self.columns or inColumn < 0:
             print(f"'{inColumn}' is out of bounds, try again")
             return False
+
+        self._invalid_move_action = False
         i = 1
         while True:
             try:
-                if self.playingField[self.rows - i, inColumn] == 0:
+                if i > int(self.rows):
+                    raise Exception("no checking further neccecary")
+                elif self.playingField[self.rows - i, inColumn] == 0:
                     self.playingField[self.rows - i, inColumn] = ActivePlayer
                     self._invalid_move_played = False
                     #self.setNextPlayer() # Set the next turn  
                     self.turns += 1  # iterate the number of turns
+                    self._invalid_move_count = 0  # reset invalid move counter to zero
                     return True
                 else:
                     # print (f"row {self.rows-i} is already filled with {self.playingField[self.rows-i, inColumn]}")
@@ -222,6 +229,8 @@ class FiarGame:
             except:
                 # print(f"column {inColumn} is already totally filled")
                 self._invalid_move_played = True
+                self._invalid_move_count += 1
+                self._invalid_move_action = inColumn
                 return False
 
     def ShowField(self):
