@@ -26,6 +26,8 @@ class enviroment(FiarGame):
         returns the observationspace / state, reward, done, info
         """
         super().reset()
+        self.action_space = self.GetActionSpace()
+
         # return self.GetState() #, 0, False, None
         return self.playingField
 
@@ -69,6 +71,17 @@ class enviroment(FiarGame):
         # return self.GetState(), self.reward(), self.done, self.info()
         return self.playingField, self.reward(), self.done, self.info()
 
+    def block_invalid_moves(self, x=10):
+        """
+        after x attempts block the invalid moves in the action_space. Preventing the model from getting in a loop.
+        """
+        if isinstance(self._invalid_move_action, int) and self._invalid_move_count > x and self._invalid_move_played is True:
+            try:
+                self.action_space.remove(self._invalid_move_action)
+                print(f"block action:{self._invalid_move_action} from trying")
+            except:
+                print('trying to remove item from list that does not excist.')
+
     def info(self):
         dicti = {"active_player": self.active_player.name,
                  "moves_played": self.turns}
@@ -80,7 +93,10 @@ class enviroment(FiarGame):
         while not done:
             # action = self.sample()
             # action = self.active_player.select_cell(self.playingField)
-            action = self.active_player.select_cell(board=self.playingField, state=self.GetState(), actionspace=self.GetActionSpace())
+
+            self.block_invalid_moves()
+
+            action = self.active_player.select_cell(board=self.playingField, state=self.GetState(), actionspace=self.action_space)
             observation, reward, done, info = self.step(action)
 
             if not self._invalid_move_played:
@@ -88,7 +104,12 @@ class enviroment(FiarGame):
             ep_reward += reward
 
             if render:
+                print(f'actionspace: {self.action_space}')
                 self.render()
+                print('\n')
+                print(f"> Turn: {self.active_player.name} ({self.active_player.color})")
+                
+                
                 # print(observation)
                 # print (f"reward: {reward}")
 
