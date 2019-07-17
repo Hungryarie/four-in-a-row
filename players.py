@@ -59,7 +59,8 @@ class Drunk(Player):
     """
     def select_cell(self, board, state, actionspace, **kwargs):
         # return random.randint(0,np.size(board,1)-1)
-        return random.randint(min(actionspace), max(actionspace))
+        #return random.randint(min(actionspace), max(actionspace))
+        return np.random.choice(actionspace)
 
     def learn(self, **kwargs):
         pass
@@ -174,7 +175,12 @@ class DDQNPlayer(Player):
         return qs
 
     def select_cell(self, board, state, actionspace, **kwargs):
-        action = np.argmax(self.get_qs(board))
+        qs = self.get_qs(board)
+        # overrule model probabilties according to the (modified) actionspace
+        for key, prob in enumerate(qs):
+            if key not in actionspace:
+                qs[key] = -999  # set to low probability
+        action = np.argmax(qs)
         return action
 
 
