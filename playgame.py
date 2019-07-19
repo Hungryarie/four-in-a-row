@@ -153,10 +153,9 @@ def trainNN():
 
 
 def PlayInEnv():
-    Model = load_a_model('models/model4_dense2x128(softmax)_startstamp1563220199_episode6200___17.00max___12.20avg__-17.00min__1563221449.model')
+    Model = load_a_model('models/PreLoadedModel_model4_dense2x128(softmax)_startstamp1563365714_endtraining_startstamp1563370404_episode7050____7.00max____5.23avg__-14.00min__1563372123.model')
     p1 = players.DDQNPlayer(Model)
     p2 = players.Human()
-
 
     p1.name = "DDQN"
     p2.name = "Arnoud"
@@ -169,7 +168,7 @@ def PlayInEnv():
 
 
 def TestInEnv():
-    Model = load_a_model('models\model4_dense2x128(softmax)_startstamp1563220199_episode6200___17.00max___12.20avg__-17.00min__1563221449.model')
+    Model = load_a_model('models\PreLoadedModel_model4_dense2x128(softmax)_startstamp1563365714_endtraining_startstamp1563370404_episode7050____7.00max____5.23avg__-14.00min__1563372123.model')
     p1 = players.DDQNPlayer(Model)
     #p1 = players.Drunk()
     p2 = players.Drunk()
@@ -231,5 +230,5 @@ def playAgainstRandom():
 if __name__ == '__main__':
     #playAgainstRandom()
     #TestInEnv()
-    #PlayInEnv()
-    trainNN()
+    PlayInEnv()
+    #trainNN()
