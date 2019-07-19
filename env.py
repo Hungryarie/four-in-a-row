@@ -105,18 +105,19 @@ class enviroment(FiarGame):
 
             if render:
                 print(f'actionspace: {self.action_space}')
+                print(f'chosen action: {action}')
                 self.render()
                 print('\n')
                 print(f"> Turn: {self.active_player.name} ({self.active_player.color})")
-                
-                
+
+
                 # print(observation)
                 # print (f"reward: {reward}")
 
             if done:
-                pass
-                # self.render()
-                # print(self.Winnerinfo())
-                # print(f"Episode finished after {self.turns} timesteps")
-                # print("\n")
+                if render:
+                    self.render()
+                    print(self.Winnerinfo())
+                    print(f"Episode finished after {self.turns} timesteps")
+                    print("\n")
         return ep_reward
