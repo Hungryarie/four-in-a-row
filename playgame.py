@@ -43,7 +43,7 @@ def trainNN():
 
     #for stats
     log = ModelLog()
-    log.add_model_info(Model)
+    log.add_player_info(p1, p2)
     log.add_constants()
     log.write_to_file('parameters2.log')
     win_count = 0
@@ -162,7 +162,7 @@ def PlayInEnv():
     env = enviroment(p1, p2)
     env.env_info()
 
-    rew = env.test(render=True)
+    rew, _ = env.test(render=True)
     print(f"reward: {rew}")
     print(env.Winnerinfo())
 
@@ -184,7 +184,7 @@ def TestInEnv():
     for i_episode in range(201):
         observation, *_ = env.reset()
         # print (observation)
-        rew = env.test(render=False)
+        rew, winner = env.test(render=False)
 
         rewards_history.append(rew)
         #print(f"Episode {i_episode} finished with rewardpoints: {rew}")
@@ -230,5 +230,5 @@ def playAgainstRandom():
 if __name__ == '__main__':
     #playAgainstRandom()
     #TestInEnv()
-    PlayInEnv()
-    #trainNN()
+    #PlayInEnv()
+    trainNN()
