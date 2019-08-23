@@ -20,7 +20,7 @@ class Player:
     color = None
 
     def __init__(self):
-        pass
+        self.player_class = self.__class__.__name__
 
     def shutdown(self):
         pass
@@ -44,7 +44,6 @@ class Human(Player):
     """
     This player type allow a human player to play the game
     """
-    # name = "Ar"
     def select_cell(self, board, state, actionspace, **kwargs):
         cell = input("Select column to fill: ")
         return cell
@@ -67,15 +66,14 @@ class Drunk(Player):
 
 
 class DDQNPlayer(Player):
-    def __init__(self, model):
+    def __init__(self, model, *args):
+        super().__init__(*args)
         # Main model: gets trained every step => .fit()
         self.model = model.model  # self.create_model(input_shape=(10,10,3),output_num=9)
 
         # Target network: this is what will get predict against every step => .predict()
         self.target_model = model.target_model  # self.create_model(input_shape=(10, 10, 3), output_num=9)
         self.target_model.set_weights(self.model.get_weights())
-
-        self.model_name = model.model_name
 
         self.setup = False
 
@@ -162,9 +160,10 @@ class DDQNPlayer(Player):
             self.target_update_counter = 0  # reset
 
     def get_prob_action(self, state):
-        #2do:
+        # 2do:
+        pass
         prop_out_list = self.get_qs(state)
-        #random.random()
+        # random.random()
 
     def get_qs(self, state):
         # Queries main network for Q values given current observation space (environment state)
