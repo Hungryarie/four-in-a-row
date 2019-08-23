@@ -88,6 +88,11 @@ class enviroment(FiarGame):
         return dicti
 
     def test(self, render=False):
+        """
+        test out 1 game.
+        default the render=False.
+        outputs: episode reward, winner-id
+        """        
         observation, ep_reward, done = self.reset(), False, 0
 
         while not done:
@@ -120,4 +125,4 @@ class enviroment(FiarGame):
                     print(self.Winnerinfo())
                     print(f"Episode finished after {self.turns} timesteps")
                     print("\n")
-        return ep_reward
+        return ep_reward, self.winner
