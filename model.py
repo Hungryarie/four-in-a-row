@@ -13,8 +13,8 @@ from datetime import datetime
 
 
 class ModelLog():
-    def __init__(self):
-        pass
+    def __init__(self, file):
+        self.logfilepath = file
 
     def add_player_info(self, p1, p2):
         self.player1_class = p1.player_class
@@ -62,10 +62,11 @@ class ModelLog():
             "SHOW_PREVIEW": SHOW_PREVIEW
         }
 
-    def write_to_file(self, path):
-        f = open(path, "a+")
+    def write_parameters_to_file(self):
+        f = open(self.logfilepath, "a+")
 
-        f.write(f"loaded models at = {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n") 
+        f.write(f"=================================================\n\n")
+        f.write(f"loaded models at = {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n")
 
         # player/model info
         f.write(f"player1\n")
@@ -84,6 +85,11 @@ class ModelLog():
         for key, constant in self.constants.items():
             f.write(f"{key} = {constant}\n")
         f.write("\n")
+        f.close()
+
+    def log_text_to_file(self, text):
+        f = open(self.logfilepath, "a+")
+        f.write(f"{text}\n")
         f.close()
 
 
