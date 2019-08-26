@@ -87,7 +87,7 @@ class DDQNPlayer(Player):
         """
         if self.setup is False:
             # setup custom tensorboard object
-            self.tensorboard = ModifiedTensorBoard(log_dir=f"logs/{self.model_name}-{int(time.time())}")
+            self.tensorboard = ModifiedTensorBoard(log_dir=f"logs/{self.model.model_name}-{int(time.time())}")
 
             # Used to count when to update target network with main network's weights
             self.target_update_counter = 0
