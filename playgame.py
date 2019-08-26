@@ -11,6 +11,7 @@ from constants import *
 import os
 import tensorflow as tf
 import time
+from datetime import datetime
 
 
 SHOW_EVERY = 50
@@ -42,15 +43,16 @@ def trainNN():
 
 
     #for stats
-    log = ModelLog()
+    log = ModelLog('parameters2.log')
     log.add_player_info(p1, p2)
     log.add_constants()
-    log.write_to_file('parameters2.log')
+    log.write_parameters_to_file()
     win_count = 0
     loose_count = 0
     draw_count = 0
     invalidmove_count = 0
 
+    log.log_text_to_file(f"start training at: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n")
     env.player1.setup_for_training()
     # Iterate over episodes
     for episode in tqdm(range(1, EPISODES + 1), ascii=True, unit='episodes'):
@@ -117,7 +119,7 @@ def trainNN():
 
         # tensorboard stats
         if env.winner == env.player1.player_id:
-            win_count += 1 
+            win_count += 1
         elif env.winner == env.player2.player_id:
             loose_count += 1
         else:
@@ -142,14 +144,22 @@ def trainNN():
 
             # Save model, but only when avg reward is greater or equal a set value
             if average_reward >= MIN_REWARD:
-                env.player1.model.save(f'models/{log.model_name}_startstamp{log.model_timestamp}_episode{episode}_{max_reward:_>7.2f}max_{average_reward:_>7.2f}avg_{min_reward:_>7.2f}min__{int(time.time())}.model')
+                model_temp_name = f'models/{log.model_name}_startstamp{log.model_timestamp}_episode{episode}_{max_reward:_>7.2f}max_{average_reward:_>7.2f}avg_{min_reward:_>7.2f}min__{int(time.time())}.model'
+                env.player1.model.save(model_temp_name)
+                log.log_text_to_file(f"model saved at: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n")
+                log.log_text_to_file(f' {model_temp_name}\n')
 
         # Decay epsilon
         if epsilon > MIN_EPSILON:
             epsilon *= EPSILON_DECAY
             epsilon = max(MIN_EPSILON, epsilon)
 
-    env.player1.model.save(f'models/{log.model_name}_startstamp{log.model_timestamp}_endtraining__{max_reward:_>7.2f}max_{average_reward:_>7.2f}avg_{min_reward:_>7.2f}min__{int(time.time())}.model')
+    # finally save model after training.
+    model_temp_name = f'models/{log.model_name}_startstamp{log.model_timestamp}_endtraining__{max_reward:_>7.2f}max_{average_reward:_>7.2f}avg_{min_reward:_>7.2f}min__{int(time.time())}.model'
+    env.player1.model.save(model_temp_name)
+    log.log_text_to_file(f"model saved at: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n")
+    log.log_text_to_file(f' {model_temp_name}\n')
+    log.log_text_to_file(f"end training at: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n")
 
 
 def PlayInEnv():
@@ -200,35 +210,8 @@ def TestInEnv():
     plt.show()
 
 
-def playAgainstRandom():
-    p1 = players.Human()
-    p2 = players.Drunk()
-    p1.name = "Arnoud"
-    p2.name = "Henk"
-    Game = FiarGame(p1, p2)
-
-    print(Game.GetActionSpace())
-    print(Game.GetState())
-
-    print(f"the game of '{Game.player1.name}' vs '{Game.player2.name}'")
-
-    while not Game.done:
-        # print (f"{Game.opponentColor}:{Game.opponentName}'s turn")
-        # print (f"cell random:{Game.active_player.select_cell(Game.playingField)}")
-        print(f"> Turn: {Game.active_player.name} ({Game.active_player.color})")
-
-        ColumnNo = Game.active_player.select_cell(board=Game.playingField, state=Game.GetState(), actionspace=Game.GetActionSpace())  # random.randint(0,Game.columns-1)
-
-        if Game.addCoin(ColumnNo, Game.current_player):
-            Game.ShowField2()
-            if Game.CheckGameEnd():
-                print(Game.Winnerinfo())
-                break
-            Game.setNextPlayer()
-
-
 if __name__ == '__main__':
-    #playAgainstRandom()
+
     #TestInEnv()
     #PlayInEnv()
     trainNN()
