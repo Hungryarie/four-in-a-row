@@ -18,6 +18,9 @@ test*
 log/
 logs/
 
+# ignore csv
+*.csv
+
 # compile files
 *.pyc
 __pycache__/
