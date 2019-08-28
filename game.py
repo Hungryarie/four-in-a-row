@@ -3,11 +3,11 @@ import random
 
 
 class FiarGame:
-    REWARD_WINNING = 20  # 10
-    REWARD_LOSING = -10
-    REWARD_TIE = -5  #
-    REWARD_INVALID_MOVE = -0.5 # -2
-    REWARD_STEP = -0.5
+    REWARD_WINNING = 200  # 20
+    REWARD_LOSING = -100  #-10
+    REWARD_TIE = -100  # -5
+    REWARD_INVALID_MOVE = -10  # -0.5
+    REWARD_STEP = -5  # -0.5
 
     def __init__(self, player1, player2):
 
