@@ -5,7 +5,7 @@ import players
 from game import FiarGame
 from env import enviroment
 #
-from model import ModelLog, load_a_model, model_1, model_2, model_3, model_4
+from model import ModelLog, load_a_model, model1, model2, model3, model4
 from tqdm import tqdm
 from constants import *
 import os
@@ -31,7 +31,7 @@ def trainNN():
     if not os.path.isdir('models'):
         os.makedirs('models')
 
-    Model = model_4(input_shape=(6, 7, 1), output_num=7)  # (7, 6, 1)(1, 42)
+    Model = model4(input_shape=(6, 7, 1), output_num=7)  # (7, 6, 1)(1, 42)
     #Model = load_a_model('models/model4_dense2x128(softmax)_startstamp1563220199_episode6200___17.00max___12.20avg__-17.00min__1563221449.model')
     #Model2 = load_a_model('models/model4_dense2x128(softmax)_startstamp1563220199_episode6200___17.00max___12.20avg__-17.00min__1563221449.model')
     p1 = players.DDQNPlayer(Model)
@@ -43,9 +43,10 @@ def trainNN():
 
 
     #for stats
-    log = ModelLog('parameters2.log')
+    log = ModelLog('parameters.log')
     log.add_player_info(p1, p2)
     log.add_constants()
+    log.write_to_csv()
     log.write_parameters_to_file()
     win_count = 0
     loose_count = 0
@@ -144,7 +145,7 @@ def trainNN():
 
             # Save model, but only when avg reward is greater or equal a set value
             if average_reward >= MIN_REWARD:
-                model_temp_name = f'models/{log.model_name}_startstamp{log.model_timestamp}_episode{episode}_{max_reward:_>7.2f}max_{average_reward:_>7.2f}avg_{min_reward:_>7.2f}min__{int(time.time())}.model'
+                model_temp_name = f'models/{log.model1_name}_startstamp{log.model1_timestamp}_episode{episode}_{max_reward:_>7.2f}max_{average_reward:_>7.2f}avg_{min_reward:_>7.2f}min__{int(time.time())}.model'
                 env.player1.model.save(model_temp_name)
                 log.log_text_to_file(f"model saved at: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n")
                 log.log_text_to_file(f' {model_temp_name}\n')
@@ -155,7 +156,7 @@ def trainNN():
             epsilon = max(MIN_EPSILON, epsilon)
 
     # finally save model after training.
-    model_temp_name = f'models/{log.model_name}_startstamp{log.model_timestamp}_endtraining__{max_reward:_>7.2f}max_{average_reward:_>7.2f}avg_{min_reward:_>7.2f}min__{int(time.time())}.model'
+    model_temp_name = f'models/{log.model1_name}_startstamp{log.model1_timestamp}_endtraining__{max_reward:_>7.2f}max_{average_reward:_>7.2f}avg_{min_reward:_>7.2f}min__{int(time.time())}.model'
     env.player1.model.save(model_temp_name)
     log.log_text_to_file(f"model saved at: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n")
     log.log_text_to_file(f' {model_temp_name}\n')
