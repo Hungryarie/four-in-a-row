@@ -8,8 +8,9 @@ from keras.optimizers import Adam
 from constants import *
 from game import FiarGame
 import time
-
 from datetime import datetime
+
+import csv
 
 
 class ModelLog():
@@ -23,23 +24,30 @@ class ModelLog():
         self.player1_name = p1.name
         self.player2_name = p2.name
 
+        self.timestamp = int(time.time())
+        self.timenow = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+
         try:
             self.model1_name = p1.model.model_name
             self.model1_class = p1.model.model_class
             self.model1_timestamp = p1.model.timestamp
+            self.model1_fullname = f'{self.model1_class}_{self.model1_name}_startstamp{self.model1_timestamp}'
         except AttributeError:
             self.model1_name = 'n/a'
             self.model1_class = 'n/a'
             self.model1_timestamp = 'n/a'
+            self.model1_fullname = 'n/a'
 
         try:
             self.model2_name = p2.model.model_name
             self.model2_class = p2.model.model_class
             self.model2_timestamp = p2.model.timestamp
+            self.model2_fullname = f'{self.model2_class}_{self.model2_name}_startstamp{self.model2_timestamp}'
         except AttributeError:
             self.model2_name = 'n/a'
             self.model2_class = 'n/a'
             self.model2_timestamp = 'n/a'
+            self.model2_fullname = 'n/a'
 
     def add_constants(self):
         self.constants = {
@@ -66,25 +74,32 @@ class ModelLog():
         f = open(self.logfilepath, "a+")
 
         f.write(f"=================================================\n\n")
-        f.write(f"loaded models at = {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n")
+        f.write(f"loaded models at = {self.timenow}\n")
+        f.write(f" timestamp = {self.timestamp}\n")
 
         # player/model info
         f.write(f"player1\n")
         f.write(f" class = {self.player1_class}\n")
         f.write(f" name = {self.player1_name}\n")
         f.write(f" model class = {self.model1_class}\n")
-        f.write(f" model name = {self.model1_name}-{self.model1_timestamp}\n")
+        f.write(f" model name = {self.model1_name}\n")
+        f.write(f" model startstamp = {self.model1_timestamp}\n")
+        f.write(f" model fullname = {self.model1_fullname}\n")
 
         f.write(f"player2\n")
         f.write(f" class = {self.player2_class}\n")
         f.write(f" name = {self.player2_name}\n")
         f.write(f" model class = {self.model2_class}\n")
-        f.write(f" model name = {self.model2_name}-{self.model2_timestamp}\n\n")
+        f.write(f" model name = {self.model2_name}\n")
+        f.write(f" model startstamp = {self.model2_timestamp}\n")
+        f.write(f" model fullname = {self.model2_fullname}\n")
 
         # constantsinfo
         for key, constant in self.constants.items():
             f.write(f"{key} = {constant}\n")
         f.write("\n")
+
+        # closing file
         f.close()
 
     def log_text_to_file(self, text):
@@ -92,6 +107,12 @@ class ModelLog():
         f.write(f"{text}\n")
         f.close()
 
+    def write_to_csv(self):
+        with open('parameters.csv', mode='a+', newline='') as parameters_file:
+            parameter_writer = csv.writer(parameters_file, delimiter=';', quotechar='"', quoting=csv.QUOTE_MINIMAL)
+
+            parameter_writer.writerow([self.timestamp, self.timenow, 1, self.player1_class, self.player1_name, self.model1_class, self.model1_name, self.model1_timestamp, self.model1_fullname])
+            parameter_writer.writerow([self.timestamp, self.timenow, 2, self.player2_class, self.player2_name, self.model2_class, self.model2_name, self.model2_timestamp, self.model2_fullname])
 
 # Own Tensorboard class
 class ModifiedTensorBoard(TensorBoard):
@@ -151,12 +172,12 @@ class model_base:
         pass
 
 
-class model_1(model_base):
+class model1(model_base):
     def __init__(self, input_shape, **kwargs):
         super().__init__(**kwargs)
         #self.model = self.create_model(input_shape, output_num)
         #self.target_model = self.create_model(input_shape, output_num)
-        self.model.model_name = 'model1_conv2x128'
+        self.model.model_name = 'conv2x128'
         #self.model.timestamp = int(time.time())
         #self.model.model_class = self.__class__.__name__
 
@@ -181,12 +202,12 @@ class model_1(model_base):
         return model
 
 
-class model_2(model_base):
+class model2(model_base):
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
         #self.model = self.create_model(input_shape, output_num)
         #self.target_model = self.create_model(input_shape, output_num)
-        self.model.model_name = 'model2_dense1x64'
+        self.model.model_name = 'dense1x64'
         #self.model.timestamp = int(time.time())
         #self.model.model_class = self.__class__.__name__
 
@@ -204,12 +225,12 @@ class model_2(model_base):
         return model
 
 
-class model_3(model_base):
+class model3(model_base):
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
         #self.model = self.create_model(input_shape, output_num)
         #self.target_model = self.create_model(input_shape, output_num)
-        self.model.model_name = 'model3_dense2x64'
+        self.model.model_name = 'dense2x64'
         #self.model.timestamp = int(time.time())
         #self.model.model_class = self.__class__.__name__
 
@@ -230,12 +251,12 @@ class model_3(model_base):
         return model
 
 
-class model_4(model_base):
+class model4(model_base):
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
         #self.model = self.create_model(input_shape, output_num)
         #self.target_model = self.create_model(input_shape, output_num)
-        self.model.model_name = 'model4_dense2x128(softmax)'
+        self.model.model_name = 'dense2x128(softmax)'
         #self.model.timestamp = int(time.time())
         #self.model.model_class = self.__class__.__name__
 
