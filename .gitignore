@@ -13,6 +13,9 @@ venv.bak/
 # Test code
 test*
 
+# archive files/folders
+*archive*
+
 # ignore all logs
 *.log
 log/
