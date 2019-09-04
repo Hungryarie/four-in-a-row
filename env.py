@@ -99,7 +99,11 @@ class enviroment(FiarGame):
             # action = self.sample()
             # action = self.active_player.select_cell(self.playingField)
 
-            self.block_invalid_moves()
+            self.block_invalid_moves(x=3)
+
+            if render:
+                print(f"> Turn: {self.active_player.name} ({self.active_player.color})")
+                print(f' > Actionspace: {self.action_space}')
 
             action = self.active_player.select_cell(board=self.playingField, state=self.GetState(), actionspace=self.action_space)
             observation, reward, done, info = self.step(action)
@@ -109,12 +113,13 @@ class enviroment(FiarGame):
             ep_reward += reward
 
             if render:
-                print(f'actionspace: {self.action_space}')
                 print(f'chosen action: {action}')
                 self.render()
+                #self.playingField = self.active_player.inverse_state(self.playingField)
+                #print('>> swap player colors:')
+                #self.render()
+                #self.playingField = self.active_player.inverse_state(self.playingField)
                 print('\n')
-                print(f"> Turn: {self.active_player.name} ({self.active_player.color})")
-
 
                 # print(observation)
                 # print (f"reward: {reward}")
