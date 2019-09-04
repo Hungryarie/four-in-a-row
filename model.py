@@ -49,6 +49,15 @@ class ModelLog():
             self.model2_timestamp = 'n/a'
             self.model2_fullname = 'n/a'
 
+        try:
+            self.model1_used_path = p1.model.model_used_path
+        except AttributeError:
+            self.model1_used_path = 'n/a'
+        try:
+            self.model2_used_path = p2.model.model_used_path
+        except AttributeError:
+            self.model2_used_path = 'n/a'
+
     def add_constants(self):
         self.constants = {
             "MIN_REWARD": MIN_REWARD,
@@ -85,6 +94,7 @@ class ModelLog():
         f.write(f" model name = {self.model1_name}\n")
         f.write(f" model startstamp = {self.model1_timestamp}\n")
         f.write(f" model fullname = {self.model1_fullname}\n")
+        f.write(f" model used path = {self.model1_used_path}\n")
 
         f.write(f"player2\n")
         f.write(f" class = {self.player2_class}\n")
@@ -93,6 +103,7 @@ class ModelLog():
         f.write(f" model name = {self.model2_name}\n")
         f.write(f" model startstamp = {self.model2_timestamp}\n")
         f.write(f" model fullname = {self.model2_fullname}\n")
+        f.write(f" model used path = {self.model2_used_path}\n")
 
         # constantsinfo
         for key, constant in self.constants.items():
@@ -111,8 +122,8 @@ class ModelLog():
         with open('parameters.csv', mode='a+', newline='') as parameters_file:
             parameter_writer = csv.writer(parameters_file, delimiter=';', quotechar='"', quoting=csv.QUOTE_MINIMAL)
 
-            parameter_writer.writerow([self.timestamp, self.timenow, 1, self.player1_class, self.player1_name, self.model1_class, self.model1_name, self.model1_timestamp, self.model1_fullname])
-            parameter_writer.writerow([self.timestamp, self.timenow, 2, self.player2_class, self.player2_name, self.model2_class, self.model2_name, self.model2_timestamp, self.model2_fullname])
+            parameter_writer.writerow([self.timestamp, self.timenow, 1, self.player1_class, self.player1_name, self.model1_class, self.model1_name, self.model1_timestamp, self.model1_fullname, self.model1_used_path])
+            parameter_writer.writerow([self.timestamp, self.timenow, 2, self.player2_class, self.player2_name, self.model2_class, self.model2_name, self.model2_timestamp, self.model2_fullname, self.model2_used_path])
 
 # Own Tensorboard class
 class ModifiedTensorBoard(TensorBoard):
@@ -153,8 +164,10 @@ class load_a_model:
         self.target_model = load_model(path)
         path = path[7:]  # removes subdir (models/)
         old_modelname = path.split('_')
-        self.model_name = f'PreLoadedModel_{old_modelname[0]}_{old_modelname[1]}_{old_modelname[2]}_{old_modelname[3]}'
-        self.timestamp = int(time.time())
+        self.model.model_name = f'PreTrainedModel-{old_modelname[0]}-{old_modelname[1]}-{old_modelname[2]}-{old_modelname[3]}'
+        self.model.timestamp = int(time.time())
+        self.model.model_class = self.__class__.__name__
+        self.model.model_used_path = path
 
 
 class model_base:
