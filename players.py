@@ -77,22 +77,47 @@ class DDQNPlayer(Player):
 
         self.setup = False
 
+        #self.model.model_class = self.model.model_class
+        #self.model_name = self.model.model_name
+        #self.model_timestamp = self.model.model_timestamp
+        #self.model_name2 = self.model_name.split('_')
+        #name = f'{self.model_name2[1]}_{self.model_name2[2]}_{self.model_name2[3]}'
+        #self.model_trained_on_player_id = self.find_model_player_id(name, self.model.model_class)
+
+        # check on which player-id the model was trained
+        if self.model.model_class == 'load_a_model':
+            self.model_used_path = self.model.model_used_path.split('_')
+            self.model_trained_on_player_id = self.find_model_player_id(self.model_used_path[2][10:], self.model.model_class)
+        else:
+            self.model_trained_on_player_id = None
+
         # An array with last n steps for training
         self.replay_memory = deque(maxlen=REPLAY_MEMORY_SIZE)
 
     def setup_for_training(self):
         """
-        Setup the modified tensorboard
-        Set the target update counter to zero.
+        Only run this once per trainingsession.
+        Not needed for using the model+agent (it will create an unnecessary tensorboard logfile).
+        -Setup the modified tensorboard.
+        -Set the target update counter to zero.
+
         """
         if self.setup is False:
             # setup custom tensorboard object
-            self.tensorboard = ModifiedTensorBoard(log_dir=f"logs/{self.model.model_name}-{int(time.time())}")
+            self.tensorboard = ModifiedTensorBoard(log_dir=f"logs/{self.model.model_name}-{self.model.timestamp}")
 
             # Used to count when to update target network with main network's weights
             self.target_update_counter = 0
 
             self.setup = True
+
+    def find_model_player_id(self, model_startstamp, model_class):
+        """
+        find out on which player-id the model was trained. Use the log from parameters.csv and returns player_id
+        """
+        # 2DO: find model player-id from parameters.csv and return player_id
+        player_id = 1
+        return player_id
 
     def update_replay_memory(self, transition):
         """
@@ -115,13 +140,13 @@ class DDQNPlayer(Player):
 
         # Get current states from minibatch, then query NN model for Q values
         # 2do: normilize function instead of /255
-        current_states = np.array([transition[0] for transition in minibatch]) / 2  # 55  # transition:(observation space, action, reward, new observation space, done)
+        current_states = np.array([transition[0] for transition in minibatch]) / 1  # 55  # transition:(observation space, action, reward, new observation space, done)
         current_qs_list = self.model.predict(current_states)
 
         # Get future states from minibatch, then query NN model for Q values
         # When using target network, query it, otherwise main network should be queried
         # 2do: normilize function instead of /255
-        new_current_states = np.array([transition[3] for transition in minibatch]) / 2  # 55  # transition:(observation space, action, reward, new observation space, done)
+        new_current_states = np.array([transition[3] for transition in minibatch]) / 1  # 55  # transition:(observation space, action, reward, new observation space, done)
         future_qs_list = self.target_model.predict(new_current_states)
 
         X = []
@@ -148,7 +173,7 @@ class DDQNPlayer(Player):
 
         # Fit on all samples as one batch, log only on terminal state
         # normilize function instead of /255 do: /2
-        self.model.fit(np.array(X) / 2, np.array(y), batch_size=MINIBATCH_SIZE, verbose=0, shuffle=False, callbacks=[self.tensorboard] if terminal_state else None)
+        self.model.fit(np.array(X) / 1, np.array(y), batch_size=MINIBATCH_SIZE, verbose=0, shuffle=False, callbacks=[self.tensorboard] if terminal_state else None)
 
         # Update target network counter every episode
         if terminal_state:
@@ -165,12 +190,23 @@ class DDQNPlayer(Player):
         prop_out_list = self.get_qs(state)
         # random.random()
 
+    def inverse_state(self, state):
+        """swap the player_id in the playingfield/state"""
+        inverse = np.array(state) * -1
+        return inverse
+
     def get_qs(self, state):
         # Queries main network for Q values given current observation space (environment state)
         # So this is just doing a .predict(). We do the reshape because TensorFlow wants that exact explicit way to shape. The -1 just means a variable amount of this data will/could be fed through.
         # divided by 255 is to normalize is.
         # normilize function instead of /255 do: /2
-        qs = self.model.predict(np.array(state).reshape(-1, *state.shape) / 2)[0]
+
+        # inverse state when using a loaded model AND current player-id isn't equal to on which player-id the loaded model was binded to.
+        if self.model.model_class == 'load_a_model' and self.player_id != self.model_trained_on_player_id:
+            # call function to swap the player_id's in the state
+            state = self.inverse_state(state)
+
+        qs = self.model.predict(np.array(state).reshape(-1, *state.shape) / 1)[0]
         return qs
 
     def select_cell(self, board, state, actionspace, **kwargs):
