@@ -20,42 +20,41 @@ class FiarGame:
 
         self.player2 = player2
         self.player2.color = "R"
-        self.player2.player_id = 2
+        self.player2.player_id = -1
 
         self.reset()
 
     def reset(self):
         self.playingField = np.zeros([self.rows, self.columns], dtype=int)
-        self.playingField = self.playingField[:, :, np.newaxis] 
+        self.playingField = self.playingField[:, :, np.newaxis]
         self.winner = 0                       # winner id. 0 is no winner yet
         self.winnerhow = "none"
         self.done = False
         self.turns = 0                       # amount of tries before winning
-        self.nextTurn = random.randint(1, 2)   # random pick a player to start
-        self.current_player = random.randint(1, 2)   # random pick a player to start
+        #self.nextTurn = random.randint(1, 2)   # random pick a player to start
+        self.current_player = random.choice([self.player1.player_id, self.player2.player_id])  #random.randint(1, 2)   # random pick a player to start
         self._invalid_move_played = False
         self._invalid_move_count = 0
         self._invalid_move_action = False
 
     @property
     def active_player(self):
-        if self.current_player == 1:
+        if self.current_player == self.player1.player_id:
             return self.player1
         else:
             return self.player2
 
     @property
     def inactive_player(self):
-        if self.current_player == 2:
+        if self.current_player == self.player2.player_id:
             return self.player1
         else:
             return self.player2
 
     def setNextPlayer(self):
         # Set the next turn
-        # print (f"current player={self.nextTurn}. next = {abs(self.nextTurn -2)+1}")
-        self.nextTurn = abs(self.nextTurn - 2) + 1
-        self.current_player = abs(self.current_player - 2) + 1
+        #self.current_player = abs(self.current_player - 2) + 1
+        self.current_player = self.current_player * -1
 
     def getPlayerById(self, id):
         if self.player1.player_id == id:
@@ -132,13 +131,13 @@ class FiarGame:
 
     def checkForWinnerDiaRight(self):
         #print("Check for a Diagnal Right Winner")
-        array = self.NProtate45(self.playingField)  # scew the playingfield 45degrees 
+        array = self.NProtate45(self.playingField)  # scew the playingfield 45degrees
         return sum(np.apply_along_axis(self.checkFourOnARow, axis=0, arr=array))  #axis=0: vertical
 
     def checkForWinnerDiaLeft(self):
         #print("Check for a Diagnal Left Winner")
-        array = self.NProtate275(self.playingField)  # scew the playingfield minus 45degrees 
-        return sum(np.apply_along_axis(self.checkFourOnARow, axis=0, arr=array))  #axis=0: vertical       
+        array = self.NProtate275(self.playingField)  # scew the playingfield minus 45degrees
+        return sum(np.apply_along_axis(self.checkFourOnARow, axis=0, arr=array))  #axis=0: vertical
 
     def checkForWinnerHor(self):
         #print("Check for a Horizontal Winner")
@@ -149,7 +148,7 @@ class FiarGame:
         else:
             return False
         """
-        return sum(np.apply_along_axis(self.checkFourOnARow, axis=1, arr=self.playingField))      
+        return sum(np.apply_along_axis(self.checkFourOnARow, axis=1, arr=self.playingField))
 
     def checkForWinnerVer(self):
         #print("Check for a Vertical Winner")
@@ -219,7 +218,7 @@ class FiarGame:
                 elif self.playingField[self.rows - i, inColumn] == 0:
                     self.playingField[self.rows - i, inColumn] = ActivePlayer
                     self._invalid_move_played = False
-                    #self.setNextPlayer() # Set the next turn  
+                    #self.setNextPlayer() # Set the next turn
                     self.turns += 1  # iterate the number of turns
                     self._invalid_move_count = 0  # reset invalid move counter to zero
                     return True
@@ -244,10 +243,10 @@ class FiarGame:
             for j in i:
                 if j == 0:
                     j = " "
-                elif j == 1:
+                elif j == self.player1.player_id:
                     j = self.player1.color
-                elif j == 2:
+                elif j == self.player2.player_id:
                     j = self.player2.color
-                row += "|" + str(j)   
+                row += "|" + str(j)
             row += "|"
             print(row)
