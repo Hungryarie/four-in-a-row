@@ -32,13 +32,14 @@ def trainNN():
         os.makedirs('models')
 
     Model = model4(input_shape=(6, 7, 1), output_num=7)  # (7, 6, 1)(1, 42)
-    #Model = load_a_model('models/model4_dense2x128(softmax)_startstamp1563220199_episode6200___17.00max___12.20avg__-17.00min__1563221449.model')
-    #Model2 = load_a_model('models/model4_dense2x128(softmax)_startstamp1563220199_episode6200___17.00max___12.20avg__-17.00min__1563221449.model')
+    #Model = load_a_model('models\dense2x128(softmax)_startstamp1567090369_episode9050__170.00max__152.60avg___95.00min__1567092303.model')
+    #Model2 = load_a_model('models\dense2x128(softmax)_startstamp1567090369_episode9050__170.00max__152.60avg___95.00min__1567092303.model')
+    Model2 = load_a_model('models\model4_dense2x128(softmax)_startstamp1567415644_endtraining__130.00max___-7.30avg_-430.00min_1567418542.model')
     p1 = players.DDQNPlayer(Model)
-    p2 = players.Drunk()
-    #p2 = players.DDQNPlayer(Model2)
-    p1.name = "DDQN"
-    p2.name = "Drunk Henk"
+    #p2 = players.Drunk()
+    p2 = players.DDQNPlayer(Model2)
+    p1.name = "DDQN on training"
+    p2.name = "DDQN trained model startstamp1567415644"
     env = enviroment(p1, p2)
 
 
@@ -97,17 +98,17 @@ def trainNN():
                 current_state = new_state
                 step += 1
             else:
-                action = env.active_player.select_cell(board=env.playingField, state=env.GetState(), actionspace=env.action_space)
-                semicurrent_state, reward, done, _ = env.step(action)
+                action_opponent = env.active_player.select_cell(board=env.playingField, state=env.GetState(), actionspace=env.action_space)
+                new_state, reward, done, _ = env.step(action_opponent)
 
                 if done:
                     # train one final time when losing the game
                     #print('LOST GAME: reward:{reward}, done:{done}')
                     # Every step we update replay memory and train main network
-                    env.player1.update_replay_memory((current_state, action, reward, semicurrent_state, done))
+                    env.player1.update_replay_memory((current_state, action, reward, new_state, done))
                     env.player1.train(done, step)
 
-                current_state = semicurrent_state
+                current_state = new_state
 
             if not env._invalid_move_played:
                 env.setNextPlayer()
@@ -145,7 +146,7 @@ def trainNN():
 
             # Save model, but only when avg reward is greater or equal a set value
             if average_reward >= MIN_REWARD:
-                model_temp_name = f'models/{log.model1_name}_startstamp{log.model1_timestamp}_episode{episode}_{max_reward:_>7.2f}max_{average_reward:_>7.2f}avg_{min_reward:_>7.2f}min__{int(time.time())}.model'
+                model_temp_name = f'models/{log.model1_class}_{log.model1_name}_startstamp{log.model1_timestamp}_episode{episode}_{max_reward:_>7.2f}max_{average_reward:_>7.2f}avg_{min_reward:_>7.2f}min_{int(time.time())}.model'
                 env.player1.model.save(model_temp_name)
                 log.log_text_to_file(f"model saved at: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n")
                 log.log_text_to_file(f' {model_temp_name}\n')
@@ -156,7 +157,7 @@ def trainNN():
             epsilon = max(MIN_EPSILON, epsilon)
 
     # finally save model after training.
-    model_temp_name = f'models/{log.model1_name}_startstamp{log.model1_timestamp}_endtraining__{max_reward:_>7.2f}max_{average_reward:_>7.2f}avg_{min_reward:_>7.2f}min__{int(time.time())}.model'
+    model_temp_name = f'models/{log.model1_class}_{log.model1_name}_startstamp{log.model1_timestamp}_endtraining_{max_reward:_>7.2f}max_{average_reward:_>7.2f}avg_{min_reward:_>7.2f}min_{int(time.time())}.model'
     env.player1.model.save(model_temp_name)
     log.log_text_to_file(f"model saved at: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n")
     log.log_text_to_file(f' {model_temp_name}\n')
@@ -164,12 +165,17 @@ def trainNN():
 
 
 def PlayInEnv():
-    Model = load_a_model('models/PreLoadedModel_model4_dense2x128(softmax)_startstamp1563365714_endtraining_startstamp1563370404_episode7050____7.00max____5.23avg__-14.00min__1563372123.model')
+    #Model = load_a_model('models/PreLoadedModel_model4_dense2x128(softmax)_startstamp1563365714_endtraining_startstamp1563370404_episode7050____7.00max____5.23avg__-14.00min__1563372123.model')
+    #Model = load_a_model('models\dense2x128(softmax)_startstamp1567090369_episode9050__170.00max__152.60avg___95.00min__1567092303.model')
+    #Model = load_a_model('models\model4_dense2x128(softmax)_startstamp1567106898_endtraining__155.00max___19.30avg_-215.00min_1567109405.model')
+    Model = load_a_model('models\model4_dense2x128(softmax)_startstamp1567423591_episode12450__155.00max__145.30avg__100.00min_1567426853.model')
+    Model2 = load_a_model('models\dense2x128(softmax)_startstamp1567090369_episode9050__170.00max__152.60avg___95.00min__1567092303.model')
     p1 = players.DDQNPlayer(Model)
-    p2 = players.Human()
+    #p2 = players.Human()
+    p2 = players.DDQNPlayer(Model)
 
     p1.name = "DDQN"
-    p2.name = "Arnoud"
+    p2.name = "dd"
     env = enviroment(p1, p2)
     env.env_info()
 
@@ -179,11 +185,14 @@ def PlayInEnv():
 
 
 def TestInEnv():
-    Model = load_a_model('models\PreLoadedModel_model4_dense2x128(softmax)_startstamp1563365714_endtraining_startstamp1563370404_episode7050____7.00max____5.23avg__-14.00min__1563372123.model')
+    #Model = load_a_model('models\PreLoadedModel_model4_dense2x128(softmax)_startstamp1563365714_endtraining_startstamp1563370404_episode7050____7.00max____5.23avg__-14.00min__1563372123.model')
+    #Model = load_a_model('models\dense2x128(softmax)_startstamp1567090369_episode9050__170.00max__152.60avg___95.00min__1567092303.model')
+    Model = load_a_model('models\model4_dense2x128(softmax)_startstamp1567106898_endtraining__155.00max___19.30avg_-215.00min_1567109405.model')
+    Model2 = load_a_model('models\model4_dense2x128(softmax)_startstamp1567106898_endtraining__155.00max___19.30avg_-215.00min_1567109405.model')
     p1 = players.DDQNPlayer(Model)
     #p1 = players.Drunk()
-    p2 = players.Drunk()
-    #p2 = players.DDQNPlayer(Model)
+    #p2 = players.Drunk()
+    p2 = players.DDQNPlayer(Model2)
 
     p1.name = "DDQN"
     p2.name = "drunken"
@@ -213,6 +222,6 @@ def TestInEnv():
 
 if __name__ == '__main__':
 
-    #TestInEnv()
+    TestInEnv()
     #PlayInEnv()
-    trainNN()
+    #trainNN()
