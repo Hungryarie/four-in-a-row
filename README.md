@@ -1,16 +1,24 @@
 # four-in-a-row
-playing four in a row against the computer
+Training and playing Four In A Row by the means of a neural net.
 
-How to play:
--open playgame.py
--select your players: 
-    p1 = players.Human()
-    p2 = players.Drunk()
+## How to play:
+- Open playgame.py
+    - Chose which functions you want to run in the if __name__ == '__main__' part.
+        - TestInEnv()
+        - PlayInEnv()
+        - trainNN()
+        
+- Select your players in every function: 
+    - px = players.Human()
+    - px = players.Drunk()
+    - px = players.DDQNPlayer(Model). 
+        - Where Model = modelX(input_shape=(6, 7, 1), output_num=7) 
+        - OR where Model = load_a_model('models\x.model')
 
-what works:
+## what works:
 - playing against a dump computer (plays random)
 - training pipeline for DDQN reinforcement learning model
 
 
-work to be done:
+## work to be done:
 - optimizing the reinforcement learning model
