@@ -187,7 +187,7 @@ class model_base:
 
 
 class model1(model_base):
-    def __init__(self, input_shape, **kwargs):
+    def __init__(self, **kwargs):
         super().__init__(**kwargs)
         self.model.model_name = 'conv2x128'
 
@@ -195,6 +195,7 @@ class model1(model_base):
         model = Sequential()
 
         model.add(Conv2D(128, (3, 3), input_shape=input_shape, data_format="channels_last", padding='same', activation='relu'))
+        model.add(Conv2D(128, (3, 3), padding='same', activation='relu'))
         model.add(Conv2D(128, (3, 3), padding='same', activation='relu'))
         model.add(Flatten())  # converts the 3D feature maps to 1D feature vectors
         model.add(Dense(64))
