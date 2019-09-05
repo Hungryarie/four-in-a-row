@@ -4,7 +4,7 @@ REPLAY_MEMORY_SIZE = 25_000  # 50_000  # How many last steps to keep for model t
 MIN_REPLAY_MEMORY_SIZE = 1_000  # Minimum number of steps in a memory to start training
 MINIBATCH_SIZE = 64  # How many steps (samples) to use for training
 UPDATE_TARGET_EVERY = 10  # 5  # Terminal states (end of episodes)
-MIN_REWARD = 140  # 12  # For model save
+MIN_REWARD = 120  # 12  # For model save
 MEMORY_FRACTION = 0.20  # not so relevant yet (only gpu)
 
 # Environment settings
