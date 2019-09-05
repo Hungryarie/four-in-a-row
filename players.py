@@ -77,14 +77,7 @@ class DDQNPlayer(Player):
 
         self.setup = False
 
-        #self.model.model_class = self.model.model_class
-        #self.model_name = self.model.model_name
-        #self.model_timestamp = self.model.model_timestamp
-        #self.model_name2 = self.model_name.split('_')
-        #name = f'{self.model_name2[1]}_{self.model_name2[2]}_{self.model_name2[3]}'
-        #self.model_trained_on_player_id = self.find_model_player_id(name, self.model.model_class)
-
-        # check on which player-id the model was trained
+         # check on which player-id the model was trained
         if self.model.model_class == 'load_a_model':
             self.model_used_path = self.model.model_used_path.split('_')
             self.model_trained_on_player_id = self.find_model_player_id(self.model_used_path[2][10:], self.model.model_class)
@@ -104,7 +97,7 @@ class DDQNPlayer(Player):
         """
         if self.setup is False:
             # setup custom tensorboard object
-            self.tensorboard = ModifiedTensorBoard(log_dir=f"logs/{self.model.model_name}-{self.model.timestamp}")
+            self.tensorboard = ModifiedTensorBoard(log_dir=f"logs/{self.model.model_class}-{self.model.model_name}-{self.model.timestamp}")
 
             # Used to count when to update target network with main network's weights
             self.target_update_counter = 0
