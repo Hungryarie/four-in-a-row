@@ -66,6 +66,7 @@ class ModelLog():
             "REWARD_LOSING": FiarGame.REWARD_LOSING,
             "REWARD_TIE": FiarGame.REWARD_TIE,
             "REWARD_INVALID_MOVE": FiarGame.REWARD_INVALID_MOVE,
+            "REWARD_STEP": FiarGame.REWARD_STEP,
             "DISCOUNT": DISCOUNT,
             "REPLAY_MEMORY_SIZE": REPLAY_MEMORY_SIZE,
             "MIN_REPLAY_MEMORY_SIZE": MIN_REPLAY_MEMORY_SIZE,
@@ -188,29 +189,17 @@ class model_base:
 class model1(model_base):
     def __init__(self, input_shape, **kwargs):
         super().__init__(**kwargs)
-        #self.model = self.create_model(input_shape, output_num)
-        #self.target_model = self.create_model(input_shape, output_num)
         self.model.model_name = 'conv2x128'
-        #self.model.timestamp = int(time.time())
-        #self.model.model_class = self.__class__.__name__
 
     def create_model(self, input_shape, output_num):
         model = Sequential()
 
-        model.add(Conv2D(128, (3, 3), input_shape=input_shape, data_format="channels_last", padding='same'))  # OBSERVATION_SPACE_VALUES = (10, 10, 3) a 10x10 RGB image.
-        model.add(Activation('relu'))
-        #model.add(MaxPooling2D(pool_size=(2, 2)))
-        #model.add(Dropout(0.2))
-
-        model.add(Conv2D(128, (3, 3), padding='same'))
-        model.add(Activation('relu'))
-        #model.add(MaxPooling2D(pool_size=(2, 2)))
-        #model.add(Dropout(0.2))
-
-        model.add(Flatten())  # this converts our 3D feature maps to 1D feature vectors
+        model.add(Conv2D(128, (3, 3), input_shape=input_shape, data_format="channels_last", padding='same', activation='relu'))
+        model.add(Conv2D(128, (3, 3), padding='same', activation='relu'))
+        model.add(Flatten())  # converts the 3D feature maps to 1D feature vectors
         model.add(Dense(64))
+        model.add(Dense(output_num, activation='softmax'))
 
-        model.add(Dense(output_num, activation='linear'))  # ACTION_SPACE_SIZE = how many choices (9)
         model.compile(loss="mse", optimizer=Adam(lr=0.001), metrics=['accuracy'])
         return model
 
@@ -218,22 +207,15 @@ class model1(model_base):
 class model2(model_base):
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
-        #self.model = self.create_model(input_shape, output_num)
-        #self.target_model = self.create_model(input_shape, output_num)
         self.model.model_name = 'dense1x64'
-        #self.model.timestamp = int(time.time())
-        #self.model.model_class = self.__class__.__name__
 
     def create_model(self, input_shape, output_num):
         model = Sequential()
 
-        model.add(Dense(64, input_shape=input_shape))
-        model.add(Activation('relu'))
+        model.add(Flatten())  # converts the 3D feature maps to 1D feature vectors
+        model.add(Dense(64, input_shape=input_shape, activation='relu'))
+        model.add(Dense(output_num, activation='softmax'))
 
-        model.add(Flatten())  # this converts our 3D feature maps to 1D feature vectors
-        # model.add(Dense(64))
-
-        model.add(Dense(output_num, activation='linear'))  # ACTION_SPACE_SIZE = how many choices (9)
         model.compile(loss="mse", optimizer=Adam(lr=0.001), metrics=['accuracy'])
         return model
 
@@ -241,20 +223,16 @@ class model2(model_base):
 class model3(model_base):
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
-        #self.model = self.create_model(input_shape, output_num)
-        #self.target_model = self.create_model(input_shape, output_num)
         self.model.model_name = 'dense2x64'
-        #self.model.timestamp = int(time.time())
-        #self.model.model_class = self.__class__.__name__
 
     def create_model(self, input_shape, output_num):
         model = Sequential()
 
+        model.add(Flatten())  # converts the 3D feature maps to 1D feature vectors
         model.add(Dense(64, input_shape=input_shape, activation='relu'))
         model.add(Dense(64, activation='relu'))
-        model.add(Flatten())  # this converts our 3D feature maps to 1D feature vectors
+        model.add(Dense(output_num, activation='softmax'))
 
-        model.add(Dense(output_num, activation='linear'))  # ACTION_SPACE_SIZE = how many choices (9)
         model.compile(loss="mse", optimizer=Adam(lr=0.001), metrics=['accuracy'])
         return model
 
@@ -262,11 +240,7 @@ class model3(model_base):
 class model4(model_base):
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
-        #self.model = self.create_model(input_shape, output_num)
-        #self.target_model = self.create_model(input_shape, output_num)
         self.model.model_name = 'dense2x128(softmax)'
-        #self.model.timestamp = int(time.time())
-        #self.model.model_class = self.__class__.__name__
 
     def create_model(self, input_shape, output_num):
         model = Sequential()
@@ -277,12 +251,12 @@ class model4(model_base):
         model.add(Dense(128, input_shape=input_shape))
         model.add(Activation('relu'))
 
-        model.add(Flatten())  # this converts our 3D feature maps to 1D feature vectors
+        model.add(Flatten())  # converts the 3D feature maps to 1D feature vectors
         # model.add(Dense(64))
         #model.add(Dense(128, input_shape=input_shape))
         #model.add(Activation('relu'))
 
-        model.add(Dense(output_num, activation='softmax'))  # ACTION_SPACE_SIZE = how many choices (9)
+        model.add(Dense(output_num, activation='softmax'))
         model.compile(loss="mse", optimizer=Adam(lr=0.001), metrics=['accuracy'])
         return model
 
@@ -290,11 +264,7 @@ class model4(model_base):
 class model4b(model_base):
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
-        #self.model = self.create_model(input_shape, output_num)
-        #self.target_model = self.create_model(input_shape, output_num)
-        self.model.model_name = 'dense2x128(softmax)(flattenfirst,input_shape bug gone)'
-        #self.model.timestamp = int(time.time())
-        #self.model.model_class = self.__class__.__name__
+        self.model.model_name = 'dense2x128(softmax)(flattenfirst,input_shape bug gone lr=0.001)'
 
     def create_model(self, input_shape, output_num):
         model = Sequential()
@@ -311,11 +281,7 @@ class model4b(model_base):
 class model4c(model_base):
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
-        #self.model = self.create_model(input_shape, output_num)
-        #self.target_model = self.create_model(input_shape, output_num)
         self.model.model_name = 'dense2x128(softmax)(flattenfirst,input_shape bug gone, lr=0.01)'
-        #self.model.timestamp = int(time.time())
-        #self.model.model_class = self.__class__.__name__
 
     def create_model(self, input_shape, output_num):
         model = Sequential()
@@ -339,7 +305,7 @@ class model4catcross(model_base):
 
         model.add(Dense(128, input_shape=input_shape, activation='relu'))
         model.add(Dense(128, activation='relu'))
-        model.add(Flatten())  # this converts our 3D feature maps to 1D feature vectors
+        model.add(Flatten())  # converts the 3D feature maps to 1D feature vectors
         model.add(Dense(output_num, activation='softmax'))
         
         model.compile(loss="categorical_crossentropy", optimizer=SGD(lr=0.01, momentum=0.9), metrics=['accuracy'])
