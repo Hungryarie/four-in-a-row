@@ -3,7 +3,7 @@ import tensorflow as tf
 
 from keras.models import Sequential, load_model  # , clone_model
 from keras.layers import Dense, Dropout, Conv2D, MaxPooling2D, Activation, Flatten
-from keras.optimizers import Adam
+from keras.optimizers import Adam, SGD
 
 from constants import *
 from game import FiarGame
@@ -250,14 +250,9 @@ class model3(model_base):
     def create_model(self, input_shape, output_num):
         model = Sequential()
 
-        model.add(Dense(64, input_shape=input_shape))
-        model.add(Activation('relu'))
-
-        model.add(Dense(64, input_shape=input_shape))
-        model.add(Activation('relu'))
-
+        model.add(Dense(64, input_shape=input_shape, activation='relu'))
+        model.add(Dense(64, activation='relu'))
         model.add(Flatten())  # this converts our 3D feature maps to 1D feature vectors
-        # model.add(Dense(64))
 
         model.add(Dense(output_num, activation='linear'))  # ACTION_SPACE_SIZE = how many choices (9)
         model.compile(loss="mse", optimizer=Adam(lr=0.001), metrics=['accuracy'])
@@ -289,4 +284,97 @@ class model4(model_base):
 
         model.add(Dense(output_num, activation='softmax'))  # ACTION_SPACE_SIZE = how many choices (9)
         model.compile(loss="mse", optimizer=Adam(lr=0.001), metrics=['accuracy'])
+        return model
+
+
+class model4b(model_base):
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+        #self.model = self.create_model(input_shape, output_num)
+        #self.target_model = self.create_model(input_shape, output_num)
+        self.model.model_name = 'dense2x128(softmax)(flattenfirst,input_shape bug gone)'
+        #self.model.timestamp = int(time.time())
+        #self.model.model_class = self.__class__.__name__
+
+    def create_model(self, input_shape, output_num):
+        model = Sequential()
+
+        model.add(Flatten())  # converts the 3D feature maps to 1D feature vectors
+        model.add(Dense(128, activation='relu'))
+        model.add(Dense(128, activation='relu'))
+        model.add(Dense(output_num, activation='softmax'))
+
+        model.compile(loss="mse", optimizer=Adam(lr=0.001), metrics=['accuracy'])
+        return model
+
+
+class model4c(model_base):
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+        #self.model = self.create_model(input_shape, output_num)
+        #self.target_model = self.create_model(input_shape, output_num)
+        self.model.model_name = 'dense2x128(softmax)(flattenfirst,input_shape bug gone, lr=0.01)'
+        #self.model.timestamp = int(time.time())
+        #self.model.model_class = self.__class__.__name__
+
+    def create_model(self, input_shape, output_num):
+        model = Sequential()
+
+        model.add(Flatten())  # converts the 3D feature maps to 1D feature vectors
+        model.add(Dense(128, activation='relu'))
+        model.add(Dense(128, activation='relu'))
+        model.add(Dense(output_num, activation='softmax'))
+
+        model.compile(loss="mse", optimizer=Adam(lr=0.01), metrics=['accuracy'])
+        return model
+
+
+class model4catcross(model_base):
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+        self.model.model_name = 'dense2x128(softmax+CatCrossEntr)'
+
+    def create_model(self, input_shape, output_num):
+        model = Sequential()
+
+        model.add(Dense(128, input_shape=input_shape, activation='relu'))
+        model.add(Dense(128, activation='relu'))
+        model.add(Flatten())  # this converts our 3D feature maps to 1D feature vectors
+        model.add(Dense(output_num, activation='softmax'))
+        
+        model.compile(loss="categorical_crossentropy", optimizer=SGD(lr=0.01, momentum=0.9), metrics=['accuracy'])
+        return model
+
+
+class model4catcross2(model_base):
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+        self.model.model_name = 'dense2x128(softmax+CatCrossEntr)2'
+
+    def create_model(self, input_shape, output_num):
+        model = Sequential()
+
+        model.add(Flatten())  # converts the 3D feature maps to 1D feature vectors
+        model.add(Dense(128, activation='relu'))
+        model.add(Dense(128, activation='relu'))
+        model.add(Dense(output_num, activation='softmax'))
+
+        model.compile(loss="categorical_crossentropy", optimizer=SGD(lr=0.01, momentum=0.9), metrics=['accuracy'])
+        return model
+
+
+class model4catcross3(model_base):
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+        self.model.model_name = 'dense2x128(softmax+CatCrossEntr)3 lr=0.001'
+
+    def create_model(self, input_shape, output_num):
+        model = Sequential()
+
+        model.add(Flatten())  # converts the 3D feature maps to 1D feature vectors
+        model.add(Dense(128, activation='relu'))
+        model.add(Dense(128, activation='relu'))
+        model.add(Dense(output_num, activation='softmax'))
+
+        model.compile(loss="categorical_crossentropy", optimizer=SGD(lr=0.001, momentum=0.9), metrics=['accuracy'])
         return model
