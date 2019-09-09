@@ -87,7 +87,7 @@ class DDQNPlayer(Player):
         # An array with last n steps for training
         self.replay_memory = deque(maxlen=REPLAY_MEMORY_SIZE)
 
-    def setup_for_training(self):
+    def setup_for_training(self, description=None):
         """
         Only run this once per trainingsession.
         Not needed for using the model+agent (it will create an unnecessary tensorboard logfile).
@@ -96,8 +96,12 @@ class DDQNPlayer(Player):
 
         """
         if self.setup is False:
+            if description is not None:
+                description = f" ({description})"
+            else:
+                description = ""
             # setup custom tensorboard object
-            self.tensorboard = ModifiedTensorBoard(log_dir=f"logs/{self.model.model_class}-{self.model.model_name}-{self.model.timestamp}")
+            self.tensorboard = ModifiedTensorBoard(log_dir=f"logs/{self.model.model_class}-{self.model.model_name}-{self.model.timestamp}{description}")
 
             # Used to count when to update target network with main network's weights
             self.target_update_counter = 0
@@ -122,7 +126,7 @@ class DDQNPlayer(Player):
         """
         Trains main network every step during episode
         """
-        self.setup_for_training()
+        # self.setup_for_training()  # already done
 
         # Start training only if certain number of samples is already saved
         if len(self.replay_memory) < MIN_REPLAY_MEMORY_SIZE:
