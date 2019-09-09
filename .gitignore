@@ -7,6 +7,9 @@ ENV/
 env.bak/
 venv.bak/
 
+# .bat files
+*.bat
+
 # vs Code setting
 .vscode/
 
