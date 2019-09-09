@@ -189,7 +189,7 @@ class model_base:
 class model1(model_base):
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
-        self.model.model_name = 'conv2x128'
+        self.model.model_name = 'conv3x128'
 
     def create_model(self, input_shape, output_num):
         model = Sequential()
@@ -204,6 +204,25 @@ class model1(model_base):
         model.compile(loss="mse", optimizer=Adam(lr=0.001), metrics=['accuracy'])
         return model
 
+
+class model1b(model_base):
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+        self.model.model_name = '3xconv+2xdense'
+
+    def create_model(self, input_shape, output_num):
+        model = Sequential()
+
+        model.add(Conv2D(32, (3, 3), input_shape=input_shape, data_format="channels_last", padding='same', activation='relu'))
+        model.add(Conv2D(64, (3, 3), padding='same', activation='relu'))
+        model.add(Conv2D(128, (3, 3), padding='same', activation='relu'))
+        model.add(Flatten())  # converts the 3D feature maps to 1D feature vectors
+        model.add(Dense(128, activation='relu'))
+        model.add(Dense(64, activation='relu'))
+        model.add(Dense(output_num, activation='softmax'))
+
+        model.compile(loss="mse", optimizer=Adam(lr=0.001), metrics=['accuracy'])
+        return model
 
 class model2(model_base):
     def __init__(self, **kwargs):
@@ -262,6 +281,23 @@ class model4(model_base):
         return model
 
 
+class model4a(model_base):
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+        self.model.model_name = 'dense2x128(softmax)(flattenLAST,input_shape bug gone lr=0.001)'
+
+    def create_model(self, input_shape, output_num):
+        model = Sequential()
+
+        model.add(Dense(128, input_shape=input_shape, activation='relu'))
+        model.add(Dense(128, activation='relu'))
+        model.add(Flatten())  # converts the 3D feature maps to 1D feature vectors
+        model.add(Dense(output_num, activation='softmax'))
+
+        model.compile(loss="mse", optimizer=Adam(lr=0.001), metrics=['accuracy'])
+        return model
+
+
 class model4b(model_base):
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
@@ -308,7 +344,7 @@ class model4catcross(model_base):
         model.add(Dense(128, activation='relu'))
         model.add(Flatten())  # converts the 3D feature maps to 1D feature vectors
         model.add(Dense(output_num, activation='softmax'))
-        
+
         model.compile(loss="categorical_crossentropy", optimizer=SGD(lr=0.01, momentum=0.9), metrics=['accuracy'])
         return model
 
@@ -344,4 +380,23 @@ class model4catcross3(model_base):
         model.add(Dense(output_num, activation='softmax'))
 
         model.compile(loss="categorical_crossentropy", optimizer=SGD(lr=0.001, momentum=0.9), metrics=['accuracy'])
+        return model
+
+
+class model5(model_base):
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+        self.model.model_name = 'dense4x128'
+
+    def create_model(self, input_shape, output_num):
+        model = Sequential()
+
+        model.add(Flatten())  # converts the 3D feature maps to 1D feature vectors
+        model.add(Dense(64, activation='relu'))
+        model.add(Dense(64, activation='relu'))
+        model.add(Dense(64, activation='relu'))
+        model.add(Dense(64, activation='relu'))
+        model.add(Dense(output_num, activation='softmax'))
+
+        model.compile(loss="mse", optimizer=Adam(lr=0.001), metrics=['accuracy'])
         return model
