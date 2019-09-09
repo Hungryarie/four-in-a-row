@@ -5,7 +5,7 @@ import players
 from game import FiarGame
 from env import enviroment
 #
-from model import ModelLog, load_a_model, model1, model2, model3, model4, model4a, model4b, model4catcross, model5
+from model import ModelLog, load_a_model, model1, model1b, model2, model3, model4, model4a, model4b, model4catcross, model5
 from tqdm import tqdm
 from constants import *
 import os
@@ -35,13 +35,13 @@ def trainNN(Model=None):
         Model = model5(input_shape=(6, 7, 1), output_num=7)  # (7, 6, 1)(1, 42)
         #Model = load_a_model('models\dense2x128(softmax)_startstamp1567090369_episode9050__170.00max__152.60avg___95.00min__1567092303.model')
         #Model2 = load_a_model('models\dense2x128(softmax)_startstamp1567090369_episode9050__170.00max__152.60avg___95.00min__1567092303.model')
-    #Model2 = load_a_model('models\model4a_dense2x128(softmax)(flattenLAST,input_shape bug gone lr=0.001)_startstamp1568020820_episode8350__170.00max__141.60avg__-45.00min_1568027932.model')
+    Model2 = load_a_model('models\model4a_dense2x128(softmax)(flattenLAST,input_shape bug gone lr=0.001)_startstamp1568020820_episode8350__170.00max__141.60avg__-45.00min_1568027932.model')
 
     p1 = players.DDQNPlayer(Model)
-    p2 = players.Drunk()
-    #p2 = players.DDQNPlayer(Model2)
+    #p2 = players.Drunk()
+    p2 = players.DDQNPlayer(Model2)
     p1.name = "DDQN on training"
-    p2.name = "drunk"
+    p2.name = "trained model on drunk"
     env = enviroment(p1, p2)
 
 
@@ -64,8 +64,8 @@ def trainNN(Model=None):
     log.log_text_to_file(f"start training at: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n")
 
     # setup for training
-    p2modclass = log.model2_class
-    p2modclass.replace('/', '')
+    p2modclass = str(log.model2_class)
+    p2modclass = p2modclass.replace('/', '')
     env.player1.setup_for_training(description=f"vs p2={log.player2_class}@{p2modclass}")
 
     # Iterate over episodes
@@ -261,9 +261,13 @@ def TestInEnv():
 
 def batch_train():
     model_list = []
+    model_list.append(model1b(input_shape=(6, 7, 1), output_num=7))
+    model_list.append(model1b(input_shape=(6, 7, 1), output_num=7))
+    model_list.append(model1b(input_shape=(6, 7, 1), output_num=7))
     #model_list.append(model4catcross(input_shape=(6, 7, 1), output_num=7))
-    model_list.append(model5(input_shape=(6, 7, 1), output_num=7))
-    model_list.append(model5(input_shape=(6, 7, 1), output_num=7))
+    #model_list.append(model5(input_shape=(6, 7, 1), output_num=7))
+    #model_list.append(model5(input_shape=(6, 7, 1), output_num=7))
+
 
     for model in model_list:
         trainNN(model)
