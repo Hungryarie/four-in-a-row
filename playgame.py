@@ -4,8 +4,8 @@ import matplotlib.pyplot as plt
 import players
 from game import FiarGame
 from env import enviroment
-#
 from model import ModelLog, load_a_model, model1, model1b, model1c, model1d, model2, model3, model4, model4a, model4b, model4catcross, model5
+from model import func_model1, func_model_duel1, func_model_duel1b, func_model_duel1c  # functional API specific
 from tqdm import tqdm
 from constants import *
 import os
@@ -289,10 +289,16 @@ def batch_train():
     #model_list.append(model4catcross(input_shape=(6, 7, 1), output_num=7))
     #model_list.append(model5(input_shape=(6, 7, 1), output_num=7))
     #model_list.append(model5(input_shape=(6, 7, 1), output_num=7))
-    model_list.append(load_a_model('models\model1d_3xconv+2xdenseSMALL4x4_startstamp1568634107_episode7900__170.00max___87.30avg_-310.00min_1568639921.model'))
-    model_list.append(model1d(input_shape=(6, 7, 1), output_num=7))
-    model_list.append(load_a_model('models\model1d_3xconv+2xdenseSMALL4x4_startstamp1568634107_episode7900__170.00max___87.30avg_-310.00min_1568639921.model'))
-    model_list.append(model1d(input_shape=(6, 7, 1), output_num=7))
+   # model_list.append(load_a_model('models\model1d_3xconv+2xdenseSMALL4x4_startstamp1568634107_episode7900__170.00max___87.30avg_-310.00min_1568639921.model'))
+   # model_list.append(model1d(input_shape=(6, 7, 1), output_num=7))
+   # model_list.append(load_a_model('models\model1d_3xconv+2xdenseSMALL4x4_startstamp1568634107_episode7900__170.00max___87.30avg_-310.00min_1568639921.model'))
+   # model_list.append(model1d(input_shape=(6, 7, 1), output_num=7))
+    model_list.append(func_model_duel1(input_shape=(6, 7, 1), output_num=7))
+    model_list.append(func_model_duel1(input_shape=(6, 7, 1), output_num=7))
+    model_list.append(func_model_duel1b(input_shape=(6, 7, 1), output_num=7))
+    model_list.append(func_model_duel1b(input_shape=(6, 7, 1), output_num=7))
+    model_list.append(func_model_duel1c(input_shape=(6, 7, 1), output_num=7))
+    model_list.append(func_model_duel1c(input_shape=(6, 7, 1), output_num=7))
 
     for model in model_list:
         trainNN(model)
