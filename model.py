@@ -1,7 +1,7 @@
 from keras.callbacks import TensorBoard
 import tensorflow as tf
 
-from keras.models import Sequential, load_model  # , clone_model
+from keras.models import Model as FuncModel, Sequential, load_model  # , clone_model
 from keras.layers import Dense, Dropout, Conv2D, MaxPooling2D, Activation, Flatten
 from keras.optimizers import Adam, SGD
 
@@ -181,6 +181,7 @@ class model_base:
         self.model.model_name = None
         self.model.timestamp = int(time.time())
         self.model.model_class = self.__class__.__name__
+        time.sleep(2)  # needed for batch training otherwise with 2 same models there is a possibility that they will be instanciated at the same time, which causes tensorboard to append the logfile  onto each other.
 
     def create_model(self, input_shape, output_num):
         pass
@@ -223,6 +224,47 @@ class model1b(model_base):
 
         model.compile(loss="mse", optimizer=Adam(lr=0.001), metrics=['accuracy'])
         return model
+
+
+class model1c(model_base):
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+        self.model.model_name = '3xconv+2xdenseSMALL3x3'
+
+    def create_model(self, input_shape, output_num):
+        model = Sequential()
+
+        model.add(Conv2D(12, (3, 3), input_shape=input_shape, data_format="channels_last", padding='same', activation='relu'))
+        model.add(Conv2D(24, (3, 3), padding='same', activation='relu'))
+        model.add(Conv2D(48, (3, 3), padding='same', activation='relu'))
+        model.add(Flatten())  # converts the 3D feature maps to 1D feature vectors
+        model.add(Dense(48, activation='relu'))
+        model.add(Dense(32, activation='relu'))
+        model.add(Dense(output_num, activation='softmax'))
+
+        model.compile(loss="mse", optimizer=Adam(lr=0.001), metrics=['accuracy'])
+        return model
+
+
+class model1d(model_base):
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+        self.model.model_name = '3xconv+2xdenseSMALL4x4'
+
+    def create_model(self, input_shape, output_num):
+        model = Sequential()
+
+        model.add(Conv2D(12, (4, 4), input_shape=input_shape, data_format="channels_last", padding='same', activation='relu'))
+        model.add(Conv2D(24, (4, 4), padding='same', activation='relu'))
+        model.add(Conv2D(48, (4, 4), padding='same', activation='relu'))
+        model.add(Flatten())  # converts the 3D feature maps to 1D feature vectors
+        model.add(Dense(48, activation='relu'))
+        model.add(Dense(32, activation='relu'))
+        model.add(Dense(output_num, activation='softmax'))
+
+        model.compile(loss="mse", optimizer=Adam(lr=0.001), metrics=['accuracy'])
+        return model
+
 
 class model2(model_base):
     def __init__(self, **kwargs):
