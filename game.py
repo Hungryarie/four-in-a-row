@@ -31,8 +31,7 @@ class FiarGame:
         self.winnerhow = "none"
         self.done = False
         self.turns = 0                       # amount of tries before winning
-        #self.nextTurn = random.randint(1, 2)   # random pick a player to start
-        self.current_player = random.choice([self.player1.player_id, self.player2.player_id])  #random.randint(1, 2)   # random pick a player to start
+        self.current_player = random.choice([self.player1.player_id, self.player2.player_id])  # random pick a player to start
         self._invalid_move_played = False
         self._invalid_move_count = 0
         self._invalid_move_action = False
@@ -53,7 +52,7 @@ class FiarGame:
 
     def setNextPlayer(self):
         # Set the next turn
-        #self.current_player = abs(self.current_player - 2) + 1
+        # self.current_player = abs(self.current_player - 2) + 1
         self.current_player = self.current_player * -1
 
     def getPlayerById(self, id):
