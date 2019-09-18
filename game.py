@@ -99,25 +99,20 @@ class FiarGame:
         if self.winner == 0:
             # check for horizontal winner
             self.winner = self.checkForWinnerHor()
-            self.winnerhow = "Horizontal"
         if self.winner == 0:
             # no winner? check for vertical winner
             self.winner = self.checkForWinnerVer()
-            self.winnerhow = "Vertical"
         if self.winner == 0:
             # no winner? check for diagnal winner Right
             self.winner = self.checkForWinnerDiaRight()
-            self.winnerhow = "Diagnal Right"
         if self.winner == 0:
             # no winner? check for diagnal winner Right
             self.winner = self.checkForWinnerDiaLeft()
-            self.winnerhow = "Diagnal Left"
         if self.winner != 0:
             self.done = True
         if self.checkFull():
             # check for a tie / draw
             self.done = True
-        # print(self.Winnerinfo())
 
         return self.done
 
@@ -126,32 +121,38 @@ class FiarGame:
             # print("a draw!!!!")
             self.winnerhow = "draw / tie"
             return True
-            #self.reset()
-
-    def checkForWinnerDiaRight(self):
-        #print("Check for a Diagnal Right Winner")
-        array = self.NProtate45(self.playingField)  # scew the playingfield 45degrees
-        return sum(np.apply_along_axis(self.checkFourOnARow, axis=0, arr=array))  #axis=0: vertical
-
-    def checkForWinnerDiaLeft(self):
-        #print("Check for a Diagnal Left Winner")
-        array = self.NProtate275(self.playingField)  # scew the playingfield minus 45degrees
-        return sum(np.apply_along_axis(self.checkFourOnARow, axis=0, arr=array))  #axis=0: vertical
-
-    def checkForWinnerHor(self):
-        #print("Check for a Horizontal Winner")
-        #print (np.apply_along_axis( self.checkFourOnARow, axis=1, arr=self.playingField ))
-        """
-        if sum(np.apply_along_axis( self.checkFourOnARow, axis=1, arr=self.playingField ))==WhosTurn:
-            return True
         else:
             return False
-        """
-        return sum(np.apply_along_axis(self.checkFourOnARow, axis=1, arr=self.playingField))
+
+    def checkForWinnerDiaRight(self):
+        # print("Check for a Diagnal Right Winner")
+        array = self.NProtate45(self.playingField)  # skew the playingfield 45degrees
+        winner = sum(np.apply_along_axis(self.checkFourOnARow, axis=0, arr=array))  #axis=0: vertical
+        if winner != 0:
+            self.winnerhow = "Diagnal Right"
+        return winner
+
+    def checkForWinnerDiaLeft(self):
+        # print("Check for a Diagnal Left Winner")
+        array = self.NProtate275(self.playingField)  # skew the playingfield minus 45degrees
+        winner = sum(np.apply_along_axis(self.checkFourOnARow, axis=0, arr=array))  #axis=0: vertical
+        if winner != 0:
+            self.winnerhow = "Diagnal Left"
+        return winner
+
+    def checkForWinnerHor(self):
+        # print("Check for a Horizontal Winner")
+        winner = sum(np.apply_along_axis(self.checkFourOnARow, axis=1, arr=self.playingField))
+        if winner != 0:
+            self.winnerhow = "Horizontal"
+        return winner
 
     def checkForWinnerVer(self):
-        #print("Check for a Vertical Winner")
-        return sum(np.apply_along_axis(self.checkFourOnARow, axis=0, arr=self.playingField))
+        # print("Check for a Vertical Winner")
+        winner = sum(np.apply_along_axis(self.checkFourOnARow, axis=0, arr=self.playingField))
+        if winner != 0:
+            self.winnerhow = "Vertical"
+        return winner
 
     @staticmethod
     def NProtate45(array):
