@@ -66,6 +66,10 @@ class Drunk(Player):
 
 
 class DDQNPlayer(Player):
+    """
+    Double deep Q Network agent
+    """
+
     def __init__(self, model, *args):
         super().__init__(*args)
         # Main model: gets trained every step => .fit()
@@ -110,7 +114,8 @@ class DDQNPlayer(Player):
 
     def find_model_player_id(self, model_startstamp, model_class):
         """
-        find out on which player-id the model was trained. Use the log from parameters.csv and returns player_id
+        find out on which player-id the model was trained. returns on default Player 1.
+        2Do: Use the log from parameters.csv and return player_id
         """
         # 2DO: find model player-id from parameters.csv and return player_id
         player_id = 1
