@@ -15,8 +15,8 @@ class enviroment(FiarGame):
         super().__init__(*args)
         # self.observation_space = self.GetObservationSpace()
         self.observation_space_n = self.GetObservationSize()
-        self.observation_max = 2
-        self.observation_min = 0
+        self.observation_max = self.player1.player_id  # equals 1
+        self.observation_min = self.player2.player_id  # equals -1
         self.action_space = self.GetActionSpace()
         self.action_space_n = self.GetActionSize()
 
@@ -33,7 +33,7 @@ class enviroment(FiarGame):
 
     def render(self):
         """
-        reders the game
+        renders the game
         """
         self.ShowField2()
 
@@ -45,20 +45,38 @@ class enviroment(FiarGame):
         """
         returns a random action from the actionspace.
         """
-        return random.randint(0, self.action_space_n - 1)
+        #return random.randint(0, self.action_space_n - 1)
+        return np.random.choice(self.action_space)
 
     def reward(self):
         reward = self.REWARD_STEP
+        if self.active_player.player_id == self.player1.player_id:
+            reward_p1 = self.REWARD_STEP
+            reward_p2 = self.REWARD_STEP  # 0
+        if self.active_player.player_id == self.player2.player_id:
+            reward_p2 = self.REWARD_STEP
+            reward_p1 = self.REWARD_STEP  # 0
+
         if self.winner == 0 and self.done is True:
             reward = self.REWARD_TIE
-        if self.winner == 1:
+            reward_p1 = self.REWARD_TIE
+            reward_p2 = self.REWARD_TIE
+        if self.winner == self.player1.player_id:
             reward = self.REWARD_WINNING
-        if self.winner == 2:
+            reward_p1 = self.REWARD_WINNING
+            reward_p2 = self.REWARD_LOSING
+        if self.winner == self.player2.player_id:
             reward = self.REWARD_LOSING
+            reward_p1 = self.REWARD_LOSING
+            reward_p2 = self.REWARD_WINNING
         if self._invalid_move_played:
             reward = self.REWARD_INVALID_MOVE
+            if self.active_player.player_id == self.player1.player_id:
+                reward_p1 = self.REWARD_INVALID_MOVE
+            if self.active_player.player_id == self.player2.player_id:
+                reward_p2 = self.REWARD_INVALID_MOVE
 
-        return reward
+        return [reward, reward_p1, reward_p2]
 
     def step(self, action):
         """
@@ -92,13 +110,13 @@ class enviroment(FiarGame):
         test out 1 game.
         default the render=False.
         outputs: episode reward, winner-id
-        """        
+        """       
+        ep_reward = 0
+        ep_reward_p1 = 0
+        ep_reward_p2 = 0
         observation, ep_reward, done = self.reset(), False, 0
 
         while not done:
-            # action = self.sample()
-            # action = self.active_player.select_cell(self.playingField)
-
             self.block_invalid_moves(x=3)
 
             if render:
@@ -110,7 +128,9 @@ class enviroment(FiarGame):
 
             if not self._invalid_move_played:
                 self.setNextPlayer()
-            ep_reward += reward
+            ep_reward += reward[0]  # reward default to player 1
+            ep_reward_p1 += reward[1]   # reward for player 1
+            ep_reward_p2 += reward[2]   # reward for player 2
 
             if render:
                 print(f'chosen action: {action}')
@@ -126,8 +146,8 @@ class enviroment(FiarGame):
 
             if done:
                 if render:
-                    self.render()
+                    #self.render()
                     print(self.Winnerinfo())
                     print(f"Episode finished after {self.turns} timesteps")
                     print("\n")
-        return ep_reward, self.winner
+        return [ep_reward, ep_reward_p1, ep_reward_p2], self.winner
