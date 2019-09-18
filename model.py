@@ -1,9 +1,11 @@
 from keras.callbacks import TensorBoard
 import tensorflow as tf
 
-from keras.models import Model as FuncModel, Sequential, load_model  # , clone_model
+from keras.models import Sequential, load_model, Model as FuncModel
 from keras.layers import Dense, Dropout, Conv2D, MaxPooling2D, Activation, Flatten
-from keras.optimizers import Adam, SGD
+from keras.layers import Input, Add, Subtract, Lambda  # functional API specific
+import keras.backend as K
+from keras.optimizers import Adam, SGD, RMSprop
 
 from constants import *
 from game import FiarGame
@@ -263,6 +265,127 @@ class model1d(model_base):
         model.add(Dense(output_num, activation='softmax'))
 
         model.compile(loss="mse", optimizer=Adam(lr=0.001), metrics=['accuracy'])
+        return model
+
+
+class func_model1(model_base):
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+        self.model.model_name = 'Func_3xconv+2xdenseSMALL4x4'
+
+    def create_model(self, input_shape, output_num):
+        # This returns a tensor
+        inputs = Input(shape=input_shape)
+
+        # a layer instance is callable on a tensor, and returns a tensor
+        x = Conv2D(12, (4, 4), input_shape=input_shape, data_format="channels_last", padding='same', activation='relu')(inputs)
+        x = Conv2D(24, (4, 4), padding='same', activation='relu')(x)
+        x = Conv2D(48, (4, 4), padding='same', activation='relu')(x)
+        x = Flatten()(x)
+        x = Dense(48, activation='relu')(x)
+        x = Dense(32, activation='relu')(x)
+        predictions = Dense(output_num, activation='softmax')(x)
+
+        # This creates a model that includes
+        #  the Input layer and the stacked output layers
+        model = FuncModel(inputs=inputs, outputs=predictions)
+        #model.compile(optimizer='rmsprop',
+        #            loss='categorical_crossentropy',
+        #            metrics=['accuracy'])
+        model.compile(loss="mse", optimizer=Adam(lr=0.001), metrics=['accuracy'])
+        return model
+
+
+class func_model_duel1(model_base):
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+        self.model.model_name = 'dueling_3xconv+2xdenseSMALL4x4'
+
+    def create_model(self, input_shape, output_num):
+        # This returns a tensor
+        inputs = Input(shape=input_shape)
+
+        # a layer instance is callable on a tensor, and returns a tensor
+        x = Conv2D(12, (4, 4), input_shape=input_shape, data_format="channels_last", padding='same', activation='relu')(inputs)
+        x = Conv2D(24, (4, 4), padding='same', activation='relu')(x)
+        x = Conv2D(48, (4, 4), padding='same', activation='relu')(x)
+        x = Flatten()(x)
+        x = Dense(48, activation='relu')(x)
+        x = Dense(32, activation='relu')(x)
+
+        value = Dense(1, activation='linear')(x)
+        advantage = Dense(output_num, activation='linear')(x)
+        mean = Lambda(lambda x: K.mean(x, axis=1, keepdims=True))(advantage)
+        advantage = Subtract()([advantage, mean])
+        predictions = Add()([value, advantage])
+
+        # This creates a model that includes
+        #  the Input layer and the stacked output layers
+        model = FuncModel(inputs=inputs, outputs=predictions)
+        #model.compile(optimizer='rmsprop',
+        #            loss='categorical_crossentropy',
+        #            metrics=['accuracy'])
+        model.compile(loss="mse", optimizer=Adam(lr=0.001), metrics=['accuracy'])
+        return model
+
+
+class func_model_duel1b(model_base):
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+        self.model.model_name = 'dueling_3xconv+2xdenseSMALL4x4_catCros_SGD'
+
+    def create_model(self, input_shape, output_num):
+        # This returns a tensor
+        inputs = Input(shape=input_shape)
+
+        # a layer instance is callable on a tensor, and returns a tensor
+        x = Conv2D(12, (4, 4), input_shape=input_shape, data_format="channels_last", padding='same', activation='relu')(inputs)
+        x = Conv2D(24, (4, 4), padding='same', activation='relu')(x)
+        x = Conv2D(48, (4, 4), padding='same', activation='relu')(x)
+        x = Flatten()(x)
+        x = Dense(48, activation='relu')(x)
+        x = Dense(32, activation='relu')(x)
+
+        value = Dense(1, activation='linear')(x)
+        advantage = Dense(output_num, activation='linear')(x)
+        mean = Lambda(lambda x: K.mean(x, axis=1, keepdims=True))(advantage)
+        advantage = Subtract()([advantage, mean])
+        predictions = Add()([value, advantage])
+
+        # This creates a model that includes
+        #  the Input layer and the stacked output layers
+        model = FuncModel(inputs=inputs, outputs=predictions)
+        model.compile(loss="categorical_crossentropy", optimizer=SGD(lr=0.001, momentum=0.9), metrics=['accuracy'])
+        return model
+
+
+class func_model_duel1c(model_base):
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+        self.model.model_name = 'dueling_3xconv+2xdenseSMALL4x4_catCros_Adam'
+
+    def create_model(self, input_shape, output_num):
+        # This returns a tensor
+        inputs = Input(shape=input_shape)
+
+        # a layer instance is callable on a tensor, and returns a tensor
+        x = Conv2D(12, (4, 4), input_shape=input_shape, data_format="channels_last", padding='same', activation='relu')(inputs)
+        x = Conv2D(24, (4, 4), padding='same', activation='relu')(x)
+        x = Conv2D(48, (4, 4), padding='same', activation='relu')(x)
+        x = Flatten()(x)
+        x = Dense(48, activation='relu')(x)
+        x = Dense(32, activation='relu')(x)
+
+        value = Dense(1, activation='linear')(x)
+        advantage = Dense(output_num, activation='linear')(x)
+        mean = Lambda(lambda x: K.mean(x, axis=1, keepdims=True))(advantage)
+        advantage = Subtract()([advantage, mean])
+        predictions = Add()([value, advantage])
+
+        # This creates a model that includes
+        #  the Input layer and the stacked output layers
+        model = FuncModel(inputs=inputs, outputs=predictions)
+        model.compile(loss="categorical_crossentropy", optimizer=Adam(lr=0.001), metrics=['accuracy'])
         return model
 
 
