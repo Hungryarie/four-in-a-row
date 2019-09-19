@@ -3,7 +3,7 @@ import tensorflow as tf
 
 from keras.models import Sequential, load_model, Model as FuncModel
 from keras.layers import Dense, Dropout, Conv2D, MaxPooling2D, Activation, Flatten
-from keras.layers import Input, Add, Subtract, Lambda  # functional API specific
+from keras.layers import Input, Add, Subtract, Lambda, concatenate  # functional API specific
 import keras.backend as K
 from keras.optimizers import Adam, SGD, RMSprop
 
@@ -355,6 +355,77 @@ class func_model_duel1b(model_base):
         # This creates a model that includes
         #  the Input layer and the stacked output layers
         model = FuncModel(inputs=inputs, outputs=predictions)
+        model.compile(loss="categorical_crossentropy", optimizer=SGD(lr=0.001, momentum=0.9), metrics=['accuracy'])
+        return model
+
+
+class func_model_duel1b1(model_base):
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+        self.model.model_name = 'dueling_3xconv+2xdenseSMALL4x4_catCros_SGD+extra dense Functmethod1'
+
+    def create_model(self, input_shape, output_num):
+        # This returns a tensor
+        inputs = Input(shape=input_shape)
+
+        # a layer instance is callable on a tensor, and returns a tensor
+        x = Conv2D(12, (4, 4), input_shape=input_shape, data_format="channels_last", padding='same', activation='relu')(inputs)
+        x = Conv2D(24, (4, 4), padding='same', activation='relu')(x)
+        x = Conv2D(48, (4, 4), padding='same', activation='relu')(x)
+        x = Flatten()(x)
+        x = Dense(64, activation='relu')(x)
+        x = Dense(48, activation='relu')(x)
+
+        value = Dense(32, activation='relu')(x)
+        value = Dense(1, activation='linear')(value)
+
+        advantage = Dense(32, activation='relu')(x)
+        advantage = Dense(output_num, activation='linear')(advantage)
+        mean = Lambda(lambda x: K.mean(x, axis=1, keepdims=True))(advantage)
+        advantage = Subtract()([advantage, mean])
+
+        predictions = Add()([value, advantage])
+
+        # This creates a model that includes
+        #  the Input layer and the stacked output layers
+        model = FuncModel(inputs=inputs, outputs=predictions)
+        model.compile(loss="categorical_crossentropy", optimizer=SGD(lr=0.001, momentum=0.9), metrics=['accuracy'])
+        return model
+
+
+class func_model_duel1b2(model_base):
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+        self.model.model_name = 'dueling_3xconv+2xdenseSMALL4x4_catCros_SGD+extra dense Functmethod2'
+
+    def create_model(self, input_shape, output_num):
+        # This returns a tensor
+        inputs = Input(shape=input_shape)
+
+        # a layer instance is callable on a tensor, and returns a tensor
+        x = Conv2D(12, (4, 4), input_shape=input_shape, data_format="channels_last", padding='same', activation='relu')(inputs)
+        x = Conv2D(24, (4, 4), padding='same', activation='relu')(x)
+        x = Conv2D(48, (4, 4), padding='same', activation='relu')(x)
+        x = Flatten()(x)
+        x = Dense(64, activation='relu')(x)
+        x = Dense(48, activation='relu')(x)
+
+        # network separate state value and advantages
+        value_fc = Dense(32, activation='relu')(x)
+        value = Dense(1, activation='linear')(value_fc)
+        value = Lambda(lambda s: K.expand_dims(s[:, 0], -1),
+                       output_shape=(output_num,))(value)
+
+        advantage_fc = Dense(32, activation='relu')(x)
+        advantage = Dense(output_num, activation='linear')(advantage_fc)
+        advantage = Lambda(lambda a: a[:, :] - K.mean(a[:, :], keepdims=True),
+                           output_shape=(output_num,))(advantage)
+
+        q_value = concatenate([value, advantage])
+
+        # This creates a model that includes
+        #  the Input layer and the stacked output layers
+        model = FuncModel(inputs=inputs, outputs=q_value)
         model.compile(loss="categorical_crossentropy", optimizer=SGD(lr=0.001, momentum=0.9), metrics=['accuracy'])
         return model
 
