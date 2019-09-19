@@ -185,7 +185,67 @@ class DDQNPlayer(Player):
         if self.target_update_counter > UPDATE_TARGET_EVERY:
             self.target_model.set_weights(self.model.get_weights())
             self.target_update_counter = 0  # reset
+            
+    def train2(self, terminal_state, step):
+        """
+        Trains main network every step during episode
+        """
+        # Start training only if certain number of samples is already saved
+        batch_size = min(len(self.replay_memory), MINIBATCH_SIZE)
+        if len(self.replay_memory) < max(MIN_REPLAY_MEMORY_SIZE, batch_size):
+            return
 
+        # Get a minibatch of random samples from memory replay table
+        minibatch = random.sample(self.replay_memory, MINIBATCH_SIZE)
+
+        # Get current states from minibatch, then query NN model for Q values
+        # 2do: normilize function instead of /255
+        current_states = np.array([transition[0] for transition in minibatch]) / 1  # 55  # transition:(observation space, action, reward, new observation space, done)
+        current_qs_list = self.model.predict(current_states)
+
+        # Get future states from minibatch, then query NN model for Q values
+        # When using target network, query it, otherwise main network should be queried
+        # 2do: normilize function instead of /255
+        new_current_states = np.array([transition[3] for transition in minibatch]) / 1  # 55  # transition:(observation space, action, reward, new observation space, done)
+        future_action_list = self.model.predict(new_current_states)  # selection of action is from model 
+        future_qs_list = self.target_model.predict(new_current_states)
+
+        X = []
+        y = []
+
+        # Now we need to enumerate our batches
+        for index, (current_state, action, reward, new_current_state, done) in enumerate(minibatch):
+
+            # If not a terminal state, get new q from future states, otherwise set it to 0
+            # almost like with Q Learning, but we use just part of equation here
+            if not done:
+                future_action = np.argmax(future_action_list[index]) # get (new-state) future action from model
+                max_future_q = future_qs_list[index][future_action]  # but get the new-state actionvalue from target model
+                new_q = reward + DISCOUNT * max_future_q
+            else:
+                new_q = reward  # no further max_future_q possible, because done=True
+
+            # Update Q value for given state
+            current_qs = current_qs_list[index]
+            current_qs[action] = new_q  # replace the current_q for the self.model.predict() action by the new_q from the self.target_model.predict() action q-value
+
+            # And append to our training data
+            X.append(current_state)  # features = state
+            y.append(current_qs)    # labels = actions
+
+        # Fit on all samples as one batch, log only on terminal state
+        # normilize function instead of /255 do: /2
+        self.model.fit(np.array(X) / 1, np.array(y), batch_size=MINIBATCH_SIZE, verbose=0, shuffle=False, callbacks=[self.tensorboard] if terminal_state else None)
+
+        # Update target network counter every episode
+        if terminal_state:
+            self.target_update_counter += 1
+
+        # If counter reaches set value, update target network with weights of main network
+        if self.target_update_counter > UPDATE_TARGET_EVERY:
+            self.target_model.set_weights(self.model.get_weights())
+            self.target_update_counter = 0  # reset
+            
     def get_prob_action(self, state):
         # 2do:
         pass
