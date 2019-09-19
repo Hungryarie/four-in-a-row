@@ -190,8 +190,6 @@ class DDQNPlayer(Player):
         """
         Trains main network every step during episode
         """
-        # self.setup_for_training()  # already done
-
         # Start training only if certain number of samples is already saved
         batch_size = min(len(self.replay_memory), MINIBATCH_SIZE)
         if len(self.replay_memory) < max(MIN_REPLAY_MEMORY_SIZE, batch_size):
@@ -209,7 +207,7 @@ class DDQNPlayer(Player):
         # When using target network, query it, otherwise main network should be queried
         # 2do: normilize function instead of /255
         new_current_states = np.array([transition[3] for transition in minibatch]) / 1  # 55  # transition:(observation space, action, reward, new observation space, done)
-        future_action_list = self.model.predict(new_current_states)
+        future_action_list = self.model.predict(new_current_states)  # selection of action is from model 
         future_qs_list = self.target_model.predict(new_current_states)
 
         X = []
@@ -221,8 +219,8 @@ class DDQNPlayer(Player):
             # If not a terminal state, get new q from future states, otherwise set it to 0
             # almost like with Q Learning, but we use just part of equation here
             if not done:
-                future_action = np.max(future_action_list[index]) ## 2DO: need to get the action-id not the value!!!!!!
-                max_future_q = future_qs_list[index][future_action]
+                future_action = np.argmax(future_action_list[index]) # get (new-state) future action from model
+                max_future_q = future_qs_list[index][future_action]  # but get the new-state actionvalue from target model
                 new_q = reward + DISCOUNT * max_future_q
             else:
                 new_q = reward  # no further max_future_q possible, because done=True
