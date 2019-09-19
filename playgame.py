@@ -5,7 +5,7 @@ import players
 from game import FiarGame
 from env import enviroment
 from model import ModelLog, load_a_model, model1, model1b, model1c, model1d, model2, model3, model4, model4a, model4b, model4catcross, model5
-from model import func_model1, func_model_duel1, func_model_duel1b, func_model_duel1c  # functional API specific
+from model import func_model1, func_model_duel1, func_model_duel1b, func_model_duel1b1, func_model_duel1b2, func_model_duel1c  # functional API specific
 from tqdm import tqdm
 from constants import *
 import os
@@ -64,7 +64,7 @@ def trainNN(Model=None):
     # setup for training
     p2modclass = str(log.model2_class)
     p2modclass = p2modclass.replace('/', '')
-    env.player1.setup_for_training(description=f"(bugfix) vs p2={log.player2_class}@{p2modclass}")
+    env.player1.setup_for_training(description=f"(train2) vs p2={log.player2_class}@{p2modclass}")
 
     # Iterate over episodes
     for episode in tqdm(range(1, EPISODES + 1), ascii=True, unit='episodes'):
@@ -100,13 +100,13 @@ def trainNN(Model=None):
                 if done:
                     # train one final time when winning the game
                     env.player1.update_replay_memory((current_state, action_p1, reward_p1, new_state, done))
-                    env.player1.train(done, step)
+                    env.player1.train2(done, step)
 
                 if env._invalid_move_played:
                     invalidmove_count += 1  # tensorboard stats
                     # train only when invalid move played
                     env.player1.update_replay_memory((current_state, action_p1, reward_p1, new_state, done))
-                    env.player1.train(done, step)
+                    env.player1.train2(done, step)
                     step += 1
 
                 #current_state = new_state
@@ -118,7 +118,7 @@ def trainNN(Model=None):
                 if not env._invalid_move_played:
                     # Every step after p2 played we update replay memory and train main network
                     env.player1.update_replay_memory((current_state, action_p1, reward_p1, new_state, done))
-                    env.player1.train(done, step)
+                    env.player1.train2(done, step)
 
                     current_state = new_state
                     step += 1
@@ -293,12 +293,19 @@ def batch_train():
    # model_list.append(model1d(input_shape=(6, 7, 1), output_num=7))
    # model_list.append(load_a_model('models\model1d_3xconv+2xdenseSMALL4x4_startstamp1568634107_episode7900__170.00max___87.30avg_-310.00min_1568639921.model'))
    # model_list.append(model1d(input_shape=(6, 7, 1), output_num=7))
-    model_list.append(func_model_duel1(input_shape=(6, 7, 1), output_num=7))
-    model_list.append(func_model_duel1(input_shape=(6, 7, 1), output_num=7))
-    model_list.append(func_model_duel1b(input_shape=(6, 7, 1), output_num=7))
-    model_list.append(func_model_duel1b(input_shape=(6, 7, 1), output_num=7))
-    model_list.append(func_model_duel1c(input_shape=(6, 7, 1), output_num=7))
-    model_list.append(func_model_duel1c(input_shape=(6, 7, 1), output_num=7))
+  #  model_list.append(func_model_duel1(input_shape=(6, 7, 1), output_num=7))
+  #  model_list.append(func_model_duel1(input_shape=(6, 7, 1), output_num=7))
+  #  model_list.append(func_model_duel1b(input_shape=(6, 7, 1), output_num=7))
+  #  model_list.append(func_model_duel1b(input_shape=(6, 7, 1), output_num=7))
+ #   model_list.append(func_model_duel1c(input_shape=(6, 7, 1), output_num=7))
+ #   model_list.append(func_model_duel1c(input_shape=(6, 7, 1), output_num=7))
+    model_list.append(func_model_duel1b1(input_shape=(6, 7, 1), output_num=7))
+    model_list.append(func_model_duel1b1(input_shape=(6, 7, 1), output_num=7))
+    model_list.append(func_model_duel1b1(input_shape=(6, 7, 1), output_num=7))
+    model_list.append(func_model_duel1b2(input_shape=(6, 7, 1), output_num=7))
+    model_list.append(func_model_duel1b2(input_shape=(6, 7, 1), output_num=7))
+    model_list.append(func_model_duel1b2(input_shape=(6, 7, 1), output_num=7))
+
 
     for model in model_list:
         trainNN(model)
