@@ -185,7 +185,7 @@ class DDQNPlayer(Player):
         if self.target_update_counter > UPDATE_TARGET_EVERY:
             self.target_model.set_weights(self.model.get_weights())
             self.target_update_counter = 0  # reset
-            
+
     def train2(self, terminal_state, step):
         """
         Trains main network every step during episode
@@ -219,11 +219,14 @@ class DDQNPlayer(Player):
             # If not a terminal state, get new q from future states, otherwise set it to 0
             # almost like with Q Learning, but we use just part of equation here
             if not done:
-                future_action = np.argmax(future_action_list[index]) # get (new-state) future action from model
-                max_future_q = future_qs_list[index][future_action]  # but get the new-state actionvalue from target model
+                future_action = np.argmax(future_action_list[index])  # get (new-state) future action from model
+                max_future_q = future_qs_list[index][future_action]   # but get the new-state actionvalue from target model
                 new_q = reward + DISCOUNT * max_future_q
             else:
-                new_q = reward  # no further max_future_q possible, because done=True
+                bias = 0
+                if reward < 0:  # aka  losing
+                    bias = np.min(current_qs_list[index])  # get minimum from current state list
+                new_q = bias + reward  # no further max_future_q possible, because done=True
 
             # Update Q value for given state
             current_qs = current_qs_list[index]
@@ -276,7 +279,7 @@ class DDQNPlayer(Player):
         # overrule model probabilties according to the (modified) actionspace
         for key, prob in enumerate(qs):
             if key not in actionspace:
-                qs[key] = -999  # set to low probability
+                qs[key] = -99999  # set to low probability
         action = np.argmax(qs)
         return action
 
