@@ -210,6 +210,9 @@ class DDQNPlayer(Player):
         future_action_list = self.model.predict(new_current_states)  # selection of action is from model 
         future_qs_list = self.target_model.predict(new_current_states)
 
+        if np.any(np.isnan(current_qs_list)) or np.any(np.isnan(future_action_list)) or np.any(np.isnan(future_qs_list)):
+            print("NaN as output")
+
         X = []
         y = []
 
