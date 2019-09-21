@@ -212,7 +212,10 @@ class DDQNPlayer(Player):
 
         if np.any(np.isnan(current_qs_list)) or np.any(np.isnan(future_action_list)) or np.any(np.isnan(future_qs_list)):
             print("NaN as output")
-
+            print(np.min(current_states))
+            print(np.max(current_states))
+ 
+    
         X = []
         y = []
 
