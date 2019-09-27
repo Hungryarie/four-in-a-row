@@ -110,6 +110,9 @@ class DDQNPlayer(Player):
             # Used to count when to update target network with main network's weights
             self.target_update_counter = 0
 
+            # flag for NaN as model outputs 
+            self.got_NaNs = False
+
             self.setup = True
 
     def find_model_player_id(self, model_startstamp, model_class):
@@ -150,6 +153,9 @@ class DDQNPlayer(Player):
         # 2do: normilize function instead of /255
         new_current_states = np.array([transition[3] for transition in minibatch]) / 1  # 55  # transition:(observation space, action, reward, new observation space, done)
         future_qs_list = self.target_model.predict(new_current_states)
+
+        if np.any(np.isnan(current_qs_list)) or np.any(np.isnan(future_qs_list)):
+            self.got_NaNs = True
 
         X = []
         y = []
@@ -207,15 +213,17 @@ class DDQNPlayer(Player):
         # When using target network, query it, otherwise main network should be queried
         # 2do: normilize function instead of /255
         new_current_states = np.array([transition[3] for transition in minibatch]) / 1  # 55  # transition:(observation space, action, reward, new observation space, done)
-        future_action_list = self.model.predict(new_current_states)  # selection of action is from model 
+        future_action_list = self.model.predict(new_current_states)  # selection of action is from model
         future_qs_list = self.target_model.predict(new_current_states)
 
         if np.any(np.isnan(current_qs_list)) or np.any(np.isnan(future_action_list)) or np.any(np.isnan(future_qs_list)):
+            self.got_NaNs = True
             print("NaN as output")
-            print(np.min(current_states))
-            print(np.max(current_states))
- 
-    
+            print(f"min current state: {np.min(current_states)}")
+            print(f"max current state: {np.max(current_states)}")
+            print(f"min new current state: {np.min(new_current_states)}")
+            print(f"max new current state: {np.max(new_current_states)}")
+
         X = []
         y = []
 
@@ -229,10 +237,7 @@ class DDQNPlayer(Player):
                 max_future_q = future_qs_list[index][future_action]   # but get the new-state actionvalue from target model
                 new_q = reward + DISCOUNT * max_future_q
             else:
-                bias = 0
-                if reward < 0:  # aka  losing
-                    bias = np.min(current_qs_list[index])  # get minimum from current state list
-                new_q = bias + reward  # no further max_future_q possible, because done=True
+                new_q = reward  # no further max_future_q possible, because done=True
 
             # Update Q value for given state
             current_qs = current_qs_list[index]
@@ -254,7 +259,7 @@ class DDQNPlayer(Player):
         if self.target_update_counter > UPDATE_TARGET_EVERY:
             self.target_model.set_weights(self.model.get_weights())
             self.target_update_counter = 0  # reset
-            
+
     def get_prob_action(self, state):
         # 2do:
         pass
