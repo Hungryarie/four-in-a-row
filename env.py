@@ -48,7 +48,7 @@ class enviroment(FiarGame):
         #return random.randint(0, self.action_space_n - 1)
         return np.random.choice(self.action_space)
 
-    def reward(self):
+    def reward(self, reward_clipping=False):
         reward = self.REWARD_STEP
         if self.active_player.player_id == self.player1.player_id:
             reward_p1 = self.REWARD_STEP
@@ -76,8 +76,20 @@ class enviroment(FiarGame):
             if self.active_player.player_id == self.player2.player_id:
                 reward_p2 = self.REWARD_INVALID_MOVE
 
+        if reward_clipping:
+            reward = self.reward_clipping(reward)
+            reward_p1 = self.reward_clipping(reward_p1)
+            reward_p2 = self.reward_clipping(reward_p2)
+        
         return [reward, reward_p1, reward_p2]
 
+    def reward_clipping(self, reward):
+        if reward < 0:
+            reward = -1
+        if reward > 0:
+            reward = 1
+        return reward
+    
     def step(self, action):
         """
         returns
@@ -87,7 +99,7 @@ class enviroment(FiarGame):
         self.CheckGameEnd()
 
         # return self.GetState(), self.reward(), self.done, self.info()
-        return self.playingField, self.reward(), self.done, self.info()
+        return self.playingField, self.reward(reward_clipping=False), self.done, self.info()
 
     def block_invalid_moves(self, x=10):
         """
