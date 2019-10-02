@@ -12,6 +12,11 @@ from constants import *
 from game import FiarGame
 import time
 from datetime import datetime
+import numpy as np
+import matplotlib.pyplot as plt
+from matplotlib.ticker import (AutoMinorLocator, MultipleLocator)
+import matplotlib.animation as animation
+import random
 
 import csv
 
@@ -208,6 +213,183 @@ class load_a_model:
         time.sleep(2)  # needed for batch training otherwise with 2 same models there is a possibility that they will be instanciated at the same time, which causes tensorboard to append the logfile  onto each other.
 
 
+class AnalyseModel:
+    def __init__(self, model, analyze_layers=[1, 4]):
+        """https://github.com/gabrielpierobon/cnnshapes"""
+
+        layer_outputs = [layer.output for layer in model.layers[analyze_layers[0]:analyze_layers[1]]]               # Extracts the outputs of the top x layers
+        self.activation_model = FuncModel(inputs=model.input, outputs=layer_outputs)  # Creates a model that will return these outputs, given the model input
+        self.activation_model.name = "analyze_activation_model"
+        self.activationlayer_names = []
+
+        for layer in layer_outputs:
+            self.activationlayer_names.append(layer.name)
+        
+        self.state_fig = plt.figure()
+        self.state_fig.suptitle('state')
+        self.state_ims = []
+
+        self.activation_fig = plt.figure()
+        self.activation_fig.suptitle('activations')
+        self.activation_ims = []
+
+    def render_state(self, state):
+        plt.ioff()                          # turn off interactive plotting mode
+        state2 = np.array(state[:,:,0])
+        #state -= state.mean()              # Post-processes the feature to make it visually palatable
+        #state /= state.std()
+        #plt.matshow(state2)
+        state2 *= 64
+        state2 += 128
+        
+        plt.figure(self.state_fig.number)           # activate statefig
+        im = plt.imshow(state2, aspect='auto', cmap='viridis')
+        self.state_ims.append([im])
+
+    def get_activations(self, state):
+        """get activation layers for a given state"""
+
+        state = np.array([state]) #/ 1                              # convert shape from (6,7,1) => (1,6,7,1) to be put into the model
+        self.activations = self.activation_model.predict(state)     # get the output for each activation layer
+
+        return self.activations
+
+    def numberfy_activations(self, state):
+        activations = self.get_activations(state)
+
+        layer_names = self.activationlayer_names        # Names of the layers, so you can have them as part of your plot
+        images_per_row = 10
+        for idx, (layer_name, layer_activation) in enumerate(zip(layer_names, activations)):      # Displays the feature maps
+            n_features = layer_activation.shape[-1]                             # Number of features in the feature map
+            n_cols = (n_features // images_per_row) + 1                               # Tiles the activation channels in this matrix
+            
+            print(f'activation layer: {idx}, name: {layer_names[idx]}, total features: {n_features}')
+            for col in range(n_cols):                                           # Tiles each filter into a big horizontal grid
+                feature_output = {}
+                for row in range(images_per_row):
+                    
+                    node = col * images_per_row + row
+                    if node >= n_features:
+                        break
+                    channel_image = layer_activation[0,
+                                                     :, :,
+                                                     node]
+                    channel_image = np.mean(channel_image)
+                    channel_image = round(channel_image, ndigits=1)
+                    #channel_image *= 64
+                    #channel_image += 128
+                    feature_output[f'node {node}'] = channel_image
+                print(f' {feature_output}')
+
+    def visualize_activations(self, state):
+        activations = self.get_activations(state)
+
+        """first_layer_activation = activations[0]
+        print(first_layer_activation.shape)
+
+        plt.matshow(first_layer_activation[0, :, :, 4], cmap='viridis')
+        plt.title(f'layer:{self.activationlayer_names[0]} => node:{4}')
+        """
+        layer_names = self.activationlayer_names        # Names of the layers, so you can have them as part of your plot
+
+        images_per_row = 16
+        display_grid = []
+
+        for idx, (layer_name, layer_activation) in enumerate(zip(layer_names, activations)):      # Displays the feature maps
+            print(f'activation: {idx}')
+            n_features = layer_activation.shape[-1]                             # Number of features in the feature map
+            #size = layer_activation.shape[1]                                    # The feature map has shape (1, size, size, n_features).
+            size_h = layer_activation.shape[1]
+            size_w = layer_activation.shape[2]
+            n_cols = (n_features // images_per_row) + 1                               # Tiles the activation channels in this matrix
+            border_width = 2 # must be even!
+            #display_grid = np.zeros((size * n_cols, images_per_row * size))
+            display_grid.append(np.zeros(((size_h + border_width) * n_cols, images_per_row * (size_w + border_width))))
+            for col in range(n_cols):                                           # Tiles each filter into a big horizontal grid
+                for row in range(images_per_row):
+                    node = col * images_per_row + row
+                    if node >= n_features:
+                        break
+                    channel_image = layer_activation[0,
+                                                     :, :,
+                                                     node]
+                    channel_image -= channel_image.mean()                       # Post-processes the feature to make it visually palatable
+                    channel_image /= channel_image.std()
+                    channel_image *= 64
+                    channel_image += 128
+                    channel_image = np.clip(channel_image, 0, 255).astype('uint8')
+                    display_grid[idx][int(border_width/2) + (border_width * col) + col * size_h : int(border_width/2) + (border_width * col) + ((col + 1) * size_h),                 # Displays the grid
+                                      int(border_width/2) + (border_width * row) + row * size_w : int(border_width/2) + (border_width * row) + ((row + 1) * size_w)] = channel_image
+                    #dispay_grid[0:7, 0:7] 1e afbeelding
+                    #dispay_grid[0:7, 6:14] 2e afbeelding
+            scale = 1. / size_w
+            scale *= 0.7
+            """
+            plt.figure(figsize=(scale * display_grid[idx].shape[1],
+                                scale * display_grid[idx].shape[0]))
+            plt.title(layer_name)
+            plt.grid(True)
+            plt.imshow(display_grid[idx], aspect='auto', cmap='viridis')
+            """
+
+        #find max x&yshape
+        shape_x = []
+        shape_y = []
+        for grid in display_grid:
+            shape_x.append(grid.shape[1])
+            shape_y.append(grid.shape[0])
+
+        # setup plot
+        #plt.figure(self.activation_fig.number)           # activate statefig
+        self.activation_fig, axs = plt.subplots(len(display_grid),
+                                gridspec_kw={'hspace': 0.3},
+                                figsize=(scale * 0.8 * max(shape_x), scale * max(shape_y) * len(activations)))
+        self.activation_fig.suptitle(random.randint(0,99))
+
+        # iterate over subplots
+        for idx, ax in enumerate(axs):
+            #ax.plot(x, y)
+            ax.imshow(display_grid[idx], aspect='auto', cmap='viridis')
+            ax.set_title(f'{layer_names[idx]}')
+
+            #set x&y limits
+            ax.set_xlim(-1, max(shape_x))
+            ax.set_ylim(max(shape_y), -1)
+
+            # Change major ticks to show every 20.
+            ax.xaxis.set_major_locator(MultipleLocator(size_w + border_width))
+            ax.yaxis.set_major_locator(MultipleLocator(size_h + border_width))
+
+            # Change minor ticks to show every 5. (20/4 = 5)
+            ax.xaxis.set_minor_locator(AutoMinorLocator(size_w + border_width))
+            ax.yaxis.set_minor_locator(AutoMinorLocator(size_h + border_width))
+
+            ax.grid(True)  # show gridlines
+        
+        plt.savefig('image.png')
+        #plt.show()  # show plot
+        
+        #plt.close(fig)
+        #self.activation_fig = fig
+        #im = plt.imshow(state2, aspect='auto', cmap='viridis')
+        self.activation_ims.append(axs)
+
+    def render_vid(self):
+
+        #
+        plt.rcParams['animation.ffmpeg_path'] = 'D:\\Gebruikers\\Zwakenberg\\Documents\\PROJECTEN\\Python\\ffmpeg-20190930-6ca3d34-win64-static\\bin\\ffmpeg.exe'
+        FFwriter = animation.FFMpegWriter()
+        
+        ani = animation.ArtistAnimation(self.state_fig, self.state_ims, interval=50, blit=True,
+                                        repeat_delay=1000)
+        ani.save('state.mp4', writer=FFwriter)
+        #ani.save('dynamic_images.mpg')
+
+        ani = animation.ArtistAnimation(self.activation_fig, self.activation_ims, interval=50, blit=True,
+                                        repeat_delay=1000)
+        ani.save('activations.mp4', writer=FFwriter)
+
+
 class model_base:
     """
     Base class for all models
@@ -370,6 +552,16 @@ class model1d(model_base):
 
 
 class func_model1(model_base):
+    """
+    Good hyperparameters:
+    - par_loss='mse', par_opt=Adam(lr=0.001) against drunk and against itself
+
+    Medium hyperparameters:
+    -
+
+    Bad hyperparameters:
+    -
+    """
     def __init__(self, **kwargs):
         #defaults keyword arguments
         kwargs['par_loss'] = kwargs.pop('par_loss', 'mse')
@@ -412,7 +604,7 @@ class func_model_duel1b(model_base):
     -par_loss='categorical_crossentropy', par_opt=Adam(lr=0.001) => old func_model_duel1c, against trained model
 
     Medium hyperparameters:
-    
+    -
 
     Bad hyperparameters:
     -par_loss='mse', par_opt=Adam(lr=0.001) = > old func_model_duel1
