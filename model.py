@@ -281,7 +281,7 @@ class AnalyseModel:
                     feature_output[f'node {node}'] = channel_image
                 print(f' {feature_output}')
 
-    def visualize_activations(self, state):
+    def visualize_activations(self, state, turns):
         activations = self.get_activations(state)
 
         """first_layer_activation = activations[0]
@@ -332,24 +332,36 @@ class AnalyseModel:
             plt.imshow(display_grid[idx], aspect='auto', cmap='viridis')
             """
 
-        #find max x&yshape
+        # find max x&yshape
         shape_x = []
         shape_y = []
         for grid in display_grid:
             shape_x.append(grid.shape[1])
             shape_y.append(grid.shape[0])
 
+        # activate the statefig figure
+        plt.figure(self.activation_fig.number)           
         # setup plot
-        #plt.figure(self.activation_fig.number)           # activate statefig
-        self.activation_fig, axs = plt.subplots(len(display_grid),
-                                gridspec_kw={'hspace': 0.3},
-                                figsize=(scale * 0.8 * max(shape_x), scale * max(shape_y) * len(activations)))
-        self.activation_fig.suptitle(random.randint(0,99))
+        #self.activation_fig, axs = plt.subplots(len(display_grid),
+        #                        gridspec_kw={'hspace': 0.3},
+        #                        figsize=(scale * 0.8 * max(shape_x), scale * max(shape_y) * len(activations)))
+        #self.activation_fig.suptitle(random.randint(0,99))
+        # set shape
+        self.activation_fig.set_figheight(scale * max(shape_y) * len(activations)) # figsize(scale * 0.8 * max(shape_x), scale * max(shape_y) * len(activations))
+        self.activation_fig.set_figwidth(scale * 0.8 * max(shape_x))
 
+        # make subplots in one list
+        axs = []
+        for idx in range(len(display_grid)):
+            ax = plt.subplot(len(display_grid), 1, idx + 1)
+            axs.append(ax)
+
+        ims = []
         # iterate over subplots
         for idx, ax in enumerate(axs):
             #ax.plot(x, y)
-            ax.imshow(display_grid[idx], aspect='auto', cmap='viridis')
+            im = ax.imshow(display_grid[idx], aspect='auto', cmap='viridis')
+            ims.append(im)
             ax.set_title(f'{layer_names[idx]}')
 
             #set x&y limits
@@ -366,13 +378,17 @@ class AnalyseModel:
 
             ax.grid(True)  # show gridlines
         
-        plt.savefig('image.png')
+        self.save_img(plot=plt, turns=turns)
         #plt.show()  # show plot
         
         #plt.close(fig)
         #self.activation_fig = fig
-        #im = plt.imshow(state2, aspect='auto', cmap='viridis')
-        self.activation_ims.append(axs)
+        #im = ax.imshow(display_grid[0], aspect='auto', cmap='viridis')
+        #self.activation_ims.append(axs)
+        self.activation_ims.append(ims)
+    
+    def save_img(self, plot, turns):
+        plot.savefig(f'activation at turn[{turns}].png')
 
     def render_vid(self):
 
@@ -380,12 +396,12 @@ class AnalyseModel:
         plt.rcParams['animation.ffmpeg_path'] = 'D:\\Gebruikers\\Zwakenberg\\Documents\\PROJECTEN\\Python\\ffmpeg-20190930-6ca3d34-win64-static\\bin\\ffmpeg.exe'
         FFwriter = animation.FFMpegWriter()
         
-        ani = animation.ArtistAnimation(self.state_fig, self.state_ims, interval=50, blit=True,
+        ani = animation.ArtistAnimation(self.state_fig, self.state_ims, interval=200, blit=True,
                                         repeat_delay=1000)
         ani.save('state.mp4', writer=FFwriter)
         #ani.save('dynamic_images.mpg')
 
-        ani = animation.ArtistAnimation(self.activation_fig, self.activation_ims, interval=50, blit=True,
+        ani = animation.ArtistAnimation(self.activation_fig, self.activation_ims, interval=200, blit=True,
                                         repeat_delay=1000)
         ani.save('activations.mp4', writer=FFwriter)
 
