@@ -7,6 +7,7 @@ import random
 import matplotlib.pyplot as plt
 import players
 from game import FiarGame
+from model import AnalyseModel
 
 
 class enviroment(FiarGame):
@@ -117,7 +118,7 @@ class enviroment(FiarGame):
                  "moves_played": self.turns}
         return dicti
 
-    def test(self, render=False):
+    def test(self, render=False, visualize_layers=False):
         """
         test out 1 game.
         default the render=False.
@@ -127,6 +128,9 @@ class enviroment(FiarGame):
         ep_reward_p1 = 0
         ep_reward_p2 = 0
         observation, ep_reward, done = self.reset(), False, 0
+
+        if visualize_layers:
+            analyse_model = AnalyseModel(self.player1.model) # make analyse model of each layer
 
         while not done:
             self.block_invalid_moves(x=3)
@@ -156,10 +160,18 @@ class enviroment(FiarGame):
                 # print(observation)
                 # print (f"reward: {reward}")
 
+            if visualize_layers:
+                analyse_model.render_state(observation)
+                #analyse_model.numberfy_activations(observation)
+                analyse_model.visualize_activations(observation)
+
             if done:
                 if render:
                     #self.render()
                     print(self.Winnerinfo())
                     print(f"Episode finished after {self.turns} timesteps")
                     print("\n")
+                if visualize_layers:
+                    analyse_model.render_vid()
+                    
         return [ep_reward, ep_reward_p1, ep_reward_p2], self.winner
