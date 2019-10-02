@@ -218,17 +218,12 @@ def trainNN(p1_model=None, p2_model=None,  log_flag=True):
 
 def PlayInEnv():
     print("play in enviroment\n")
-    #Model = load_a_model('models/PreLoadedModel_model4_dense2x128(softmax)_startstamp1563365714_endtraining_startstamp1563370404_episode7050____7.00max____5.23avg__-14.00min__1563372123.model')
-    #Model = load_a_model('models\dense2x128(softmax)_startstamp1567090369_episode9050__170.00max__152.60avg___95.00min__1567092303.model')
-    #Model = load_a_model('models\model4_dense2x128(softmax)_startstamp1567106898_endtraining__155.00max___19.30avg_-215.00min_1567109405.model')
-    #Model = load_a_model('models\model4catcross_dense2x128(softmax+CatCrossEntr)_startstamp1568050818_episode9600__165.00max__136.40avg__-50.00min_1568052142.model')
-    #Model = load_a_model('models\model1c_3xconv+2xdenseSMALL3x3_startstamp1568311260_endtraining__170.00max___68.40avg_-180.00min_1568314587.model')
-    #Model = load_a_model('models\model1d_3xconv+2xdenseSMALL4x4_startstamp1568318071_episode9100__170.00max___99.20avg_-155.00min_1568321741.model')
-    Model = load_a_model('models/func_model_duel1b1_dueling_3xconv+2xdenseSMALL4x4_catCros_SGD+extra dense Functmethod1_startstamp1568924178_endtraining__170.00max__115.00avg_-280.00min_1568928710.model')
-    #Model2 = load_a_model('models\model4a_dense2x128(softmax)(flattenLAST,input_shape bug gone lr=0.001)_startstamp1568020820_episode8350__170.00max__141.60avg__-45.00min_1568027932.model')
-    #Model2 = load_a_model('models\model1d_3xconv+2xdenseSMALL4x4_startstamp1568318071_episode9100__170.00max___99.20avg_-155.00min_1568321741.model')
+    #Model = load_a_model('models/func_model_duel1b1_dueling_3xconv+2xdenseSMALL4x4_catCros_SGD+extra dense Functmethod1_startstamp1568924178_endtraining__170.00max__115.00avg_-280.00min_1568928710.model')
     
-    #Model = load_a_model('models/func_model_duel1b_dueling_3xconv+2xdenseSMALL4x4_catCros_SGD_startstamp1568838020_episode9500__170.00max__165.80avg__155.00min_1568848057.model')
+    #against drunk
+    #Model = load_a_model('models/func_model1_3xconv+2xdenseSMALL4x4(func)(mse^Adam^lr=0.001)_startstamp1569842535_episode7450__170.00max___66.60avg_-205.00min_1569845018.model')
+    #against model above
+    Model = load_a_model('models/func_model1_3xconv+2xdenseSMALL4x4(func)(mse^Adam^lr=0.001)_startstamp1569850212_episode9800__170.00max__165.40avg__150.00min_1569854021.model')
 
     p1 = players.DDQNPlayer(Model)
     p2 = players.Human()
@@ -239,7 +234,7 @@ def PlayInEnv():
     env = enviroment(p1, p2)
     env.env_info()
 
-    [rew, rew_p1, rew_p2], _ = env.test(render=True)
+    [rew, rew_p1, rew_p2], _ = env.test(render=True, visualize_layers=True)
     print(f"reward: {rew}")
     print(f"reward_p1: {rew_p1}")
     print(f"reward_p2: {rew_p2}")
@@ -302,10 +297,10 @@ def batch_train():
 
     model_list.append(model2(input_shape=(6, 7, 1), output_num=7))
     """
-    model_list.append(model5(input_shape=(6, 7, 1), output_num=7,
-                      par_loss='mse', par_opt=Adam(lr=0.001), par_metrics='accuracy'))
 
-    model_list.append(func_model5(input_shape=(6, 7, 1), output_num=7,
+    model_list.append(func_model1(input_shape=(6, 7, 1), output_num=7,
+                      par_loss='mse', par_opt=Adam(lr=0.001), par_metrics='accuracy'))
+    model_list.append(func_model1(input_shape=(6, 7, 1), output_num=7,
                       par_loss='mse', par_opt=Adam(lr=0.001), par_metrics='accuracy'))
 
     #model_list.append(model5(input_shape=(6, 7, 1), output_num=7,
@@ -317,19 +312,15 @@ def batch_train():
     #model_list.append(func_model5_duel1(input_shape=(6, 7, 1), output_num=7,
     #                  par_loss='mse', par_opt=Adam(lr=0.001), par_metrics='accuracy'))
 
+    #clipnorm=1.0, clipvalue=0.5
 
-
-#clipnorm=1.0, clipvalue=0.5
-
+    model2 = load_a_model('models/func_model1_3xconv+2xdenseSMALL4x4(func)(mse^Adam^lr=0.001)_startstamp1569842535_episode7450__170.00max___66.60avg_-205.00min_1569845018.model')
     for model in model_list:
-        trainNN(p1_model=model, p2_model=None, log_flag=True)
-
-
-
+        trainNN(p1_model=model, p2_model=model2, log_flag=True)
 
 
 if __name__ == '__main__':
 
     #TestInEnv()
-    #PlayInEnv()
-    batch_train()
+    PlayInEnv()
+    #batch_train()
