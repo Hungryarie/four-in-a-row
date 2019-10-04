@@ -218,6 +218,8 @@ class AnalyseModel:
         """https://github.com/gabrielpierobon/cnnshapes"""
 
         layer_outputs = [layer.output for layer in model.layers[analyze_layers[0]:analyze_layers[1]]]               # Extracts the outputs of the top x layers
+        final_layer = model.layers[len(model.layers)-1]
+        layer_outputs.append(final_layer.output)
         self.activation_model = FuncModel(inputs=model.input, outputs=layer_outputs)  # Creates a model that will return these outputs, given the model input
         self.activation_model.name = "analyze_activation_model"
         self.activationlayer_names = []
@@ -226,14 +228,16 @@ class AnalyseModel:
             self.activationlayer_names.append(layer.name)
         
         self.state_fig = plt.figure()
-        self.state_fig.suptitle('state')
+        self.state_fig.suptitle('States')  # =actually the main title
         self.state_ims = []
 
         self.activation_fig = plt.figure()
-        self.activation_fig.suptitle('activations')
+        self.activation_fig.suptitle('Activations')  # =actually the main title
         self.activation_ims = []
 
-    def render_state(self, state):
+        self.n_features = []
+
+    def render_state(self, state, turns):
         plt.ioff()                          # turn off interactive plotting mode
         state2 = np.array(state[:,:,0])
         #state -= state.mean()              # Post-processes the feature to make it visually palatable
@@ -243,8 +247,14 @@ class AnalyseModel:
         state2 += 128
         
         plt.figure(self.state_fig.number)           # activate statefig
+        plt.title(f"state at turn: {turns}")
+        
         im = plt.imshow(state2, aspect='auto', cmap='viridis')
+
         self.state_ims.append([im])
+
+        self.save_img(plot=plt, turns=turns, prefix='state at turn')
+        
 
     def get_activations(self, state):
         """get activation layers for a given state"""
@@ -255,34 +265,44 @@ class AnalyseModel:
         return self.activations
 
     def numberfy_activations(self, state):
-        activations = self.get_activations(state)
+        activations = self.activations  # get_activations(state)
 
         layer_names = self.activationlayer_names        # Names of the layers, so you can have them as part of your plot
         images_per_row = 10
+        n_features = []
+        self.activation_mean_output = []
         for idx, (layer_name, layer_activation) in enumerate(zip(layer_names, activations)):      # Displays the feature maps
-            n_features = layer_activation.shape[-1]                             # Number of features in the feature map
-            n_cols = (n_features // images_per_row) + 1                               # Tiles the activation channels in this matrix
-            
-            print(f'activation layer: {idx}, name: {layer_names[idx]}, total features: {n_features}')
+            n_features.append(layer_activation.shape[-1])                             # Number of features in the feature map
+            n_cols = (n_features[idx] // images_per_row) + 1                               # Tiles the activation channels in this matrix
+            self.activation_mean_output.append([])
+
+            print(f'activation layer: {idx}, name: {layer_names[idx]}, total features: {n_features[idx]}')
             for col in range(n_cols):                                           # Tiles each filter into a big horizontal grid
                 feature_output = {}
                 for row in range(images_per_row):
                     
                     node = col * images_per_row + row
-                    if node >= n_features:
+                    if node >= n_features[idx]:
                         break
-                    channel_image = layer_activation[0,
-                                                     :, :,
-                                                     node]
-                    channel_image = np.mean(channel_image)
-                    channel_image = round(channel_image, ndigits=1)
+
+                    if len(layer_activation.shape) == 4:  # eg. Convolution layer
+                        channel_image = layer_activation[0,
+                                                        :, :,
+                                                        node]
+                        channel_image = np.mean(channel_image)
+                    elif len(layer_activation.shape) == 2:  # eg. dense layer
+                        channel_image = layer_activation[0, node]
+
+                    self.activation_mean_output[idx].append(channel_image)
+                    channel_image = round(channel_image, ndigits=2)
                     #channel_image *= 64
                     #channel_image += 128
                     feature_output[f'node {node}'] = channel_image
                 print(f' {feature_output}')
+        self.n_features = n_features
 
     def visualize_activations(self, state, turns):
-        activations = self.get_activations(state)
+        activations = self.activations  # get_activations(state)
 
         """first_layer_activation = activations[0]
         print(first_layer_activation.shape)
@@ -292,38 +312,43 @@ class AnalyseModel:
         """
         layer_names = self.activationlayer_names        # Names of the layers, so you can have them as part of your plot
 
-        images_per_row = 16
+        images_per_row = 10
         display_grid = []
+        non_conv_layers_amount = 0
 
         for idx, (layer_name, layer_activation) in enumerate(zip(layer_names, activations)):      # Displays the feature maps
             print(f'activation: {idx}')
             n_features = layer_activation.shape[-1]                             # Number of features in the feature map
             #size = layer_activation.shape[1]                                    # The feature map has shape (1, size, size, n_features).
-            size_h = layer_activation.shape[1]
-            size_w = layer_activation.shape[2]
-            n_cols = (n_features // images_per_row) + 1                               # Tiles the activation channels in this matrix
-            border_width = 2 # must be even!
-            #display_grid = np.zeros((size * n_cols, images_per_row * size))
-            display_grid.append(np.zeros(((size_h + border_width) * n_cols, images_per_row * (size_w + border_width))))
-            for col in range(n_cols):                                           # Tiles each filter into a big horizontal grid
-                for row in range(images_per_row):
-                    node = col * images_per_row + row
-                    if node >= n_features:
-                        break
-                    channel_image = layer_activation[0,
-                                                     :, :,
-                                                     node]
-                    channel_image -= channel_image.mean()                       # Post-processes the feature to make it visually palatable
-                    channel_image /= channel_image.std()
-                    channel_image *= 64
-                    channel_image += 128
-                    channel_image = np.clip(channel_image, 0, 255).astype('uint8')
-                    display_grid[idx][int(border_width/2) + (border_width * col) + col * size_h : int(border_width/2) + (border_width * col) + ((col + 1) * size_h),                 # Displays the grid
-                                      int(border_width/2) + (border_width * row) + row * size_w : int(border_width/2) + (border_width * row) + ((row + 1) * size_w)] = channel_image
-                    #dispay_grid[0:7, 0:7] 1e afbeelding
-                    #dispay_grid[0:7, 6:14] 2e afbeelding
-            scale = 1. / size_w
-            scale *= 0.7
+            if len(layer_activation.shape) == 4:  # eg. Convolution layer
+                size_h = layer_activation.shape[1]
+                size_w = layer_activation.shape[2]
+                n_cols = (n_features // images_per_row) + 1                               # Tiles the activation channels in this matrix
+                border_width = 2 # must be even!
+                #display_grid = np.zeros((size * n_cols, images_per_row * size))
+                display_grid.append(np.zeros(((size_h + border_width) * n_cols, images_per_row * (size_w + border_width))))
+                for col in range(n_cols):                                           # Tiles each filter into a big horizontal grid
+                    for row in range(images_per_row):
+                        node = col * images_per_row + row
+                        if node >= n_features:
+                            break
+
+                        channel_image = layer_activation[0,
+                                                        :, :,
+                                                        node]
+                        channel_image -= channel_image.mean()                       # Post-processes the feature to make it visually palatable
+                        channel_image /= channel_image.std()
+                        channel_image *= 64
+                        channel_image += 128
+                        channel_image = np.clip(channel_image, 0, 255).astype('uint8')
+                        display_grid[idx][int(border_width/2) + (border_width * col) + col * size_h : int(border_width/2) + (border_width * col) + ((col + 1) * size_h),                 # Displays the grid
+                                        int(border_width/2) + (border_width * row) + row * size_w : int(border_width/2) + (border_width * row) + ((row + 1) * size_w)] = channel_image
+
+                scale = 1. / size_w
+                scale *= 0.7
+            elif len(layer_activation.shape) == 2:  # eg. dense layer
+                non_conv_layers_amount += 1
+
             """
             plt.figure(figsize=(scale * display_grid[idx].shape[1],
                                 scale * display_grid[idx].shape[0]))
@@ -347,38 +372,99 @@ class AnalyseModel:
         #                        figsize=(scale * 0.8 * max(shape_x), scale * max(shape_y) * len(activations)))
         #self.activation_fig.suptitle(random.randint(0,99))
         # set shape
-        self.activation_fig.set_figheight(scale * max(shape_y) * len(activations)) # figsize(scale * 0.8 * max(shape_x), scale * max(shape_y) * len(activations))
-        self.activation_fig.set_figwidth(scale * 0.8 * max(shape_x))
+        COL = 3 # nr of column in figure
+        self.activation_fig.set_figheight(scale * max(shape_y) * len(activations)) 
+        self.activation_fig.set_figwidth(scale * 0.8 * max(shape_x) * COL)
 
         # make subplots in one list
-        axs = []
-        for idx in range(len(display_grid)):
-            ax = plt.subplot(len(display_grid), 1, idx + 1)
-            axs.append(ax)
+        axs_act = []
+        axs_line = []
+        axs_st = []
+
+        for idx in range(len(activations)):
+            plot_id = idx*COL +1
+            ax = plt.subplot(len(activations), COL, plot_id)
+            axs_act.append(ax)
+
+            ax = plt.subplot(len(activations), COL, plot_id+1)
+            axs_line.append(ax)
+
+            ax = plt.subplot(len(activations), COL, plot_id+2)
+            axs_st.append(ax)
 
         ims = []
         # iterate over subplots
-        for idx, ax in enumerate(axs):
+        for idx, ax in enumerate(axs_act):
+            try:
+                #ax.plot(x, y)
+                im = ax.imshow(display_grid[idx], aspect='auto', cmap='viridis')
+                ims.append(im)
+                ax.set_title(f'{layer_names[idx]}')
+
+                #set x&y limits
+                ax.set_xlim(-1, max(shape_x))
+                ax.set_ylim(max(shape_y), -1)
+
+                # Change major ticks to show every x and y of the input array (creating borders).
+                ax.xaxis.set_major_locator(MultipleLocator(size_w + border_width))
+                ax.yaxis.set_major_locator(MultipleLocator(size_h + border_width))
+
+                # Change minor ticks to show every 1
+                ax.xaxis.set_minor_locator(AutoMinorLocator(size_w + border_width))
+                ax.yaxis.set_minor_locator(AutoMinorLocator(size_h + border_width))
+
+                ax.grid(True)  # show gridlines
+            except:
+                pass
+
+        for idx, ax in enumerate(axs_line):
             #ax.plot(x, y)
-            im = ax.imshow(display_grid[idx], aspect='auto', cmap='viridis')
+            x=np.array(self.activation_mean_output[idx])
+            im = ax.plot(x, label=turns)
             ims.append(im)
             ax.set_title(f'{layer_names[idx]}')
 
             #set x&y limits
-            ax.set_xlim(-1, max(shape_x))
-            ax.set_ylim(max(shape_y), -1)
+            #ax.set_xlim(-1, max(self.n_features))
+            ax.set_xlim(0, self.n_features[idx])
+            ax.set_ylim(0, max(self.activation_mean_output[idx]))
 
-            # Change major ticks to show every 20.
+            # Change major ticks to show every #.
+            ax.xaxis.set_major_locator(MultipleLocator(5))
+            ax.yaxis.set_major_locator(MultipleLocator(max(self.activation_mean_output[idx])/5))
+
+            # Change minor ticks to show every 1
+            ax.xaxis.set_minor_locator(AutoMinorLocator(5))
+            ax.yaxis.set_minor_locator(AutoMinorLocator(max(self.activation_mean_output[idx])/5))
+            ax.legend()
+            ax.grid(True)  # show gridlines
+        
+        state2 = np.array(state[:,:,0])
+        for idx, ax in enumerate(axs_st):
+            #ax.plot(x, y)
+            im = ax.imshow(state2, aspect='auto', cmap='viridis')
+            ims.append(im)
+            ax.set_title(f'{layer_names[idx]}')
+
+            #set x&y limits
+            ax.set_xlim(-1, size_w)
+            ax.set_ylim(size_h, -1)
+
+            # Change major ticks to show every x and y of the input array (creating borders).
             ax.xaxis.set_major_locator(MultipleLocator(size_w + border_width))
             ax.yaxis.set_major_locator(MultipleLocator(size_h + border_width))
 
-            # Change minor ticks to show every 5. (20/4 = 5)
+            # Change minor ticks to show every 1
             ax.xaxis.set_minor_locator(AutoMinorLocator(size_w + border_width))
             ax.yaxis.set_minor_locator(AutoMinorLocator(size_h + border_width))
 
             ax.grid(True)  # show gridlines
+
         
-        self.save_img(plot=plt, turns=turns)
+        #im = self.state_ims[len(self.state_ims)-1]
+        #ims.append(im)
+
+        self.save_img(plot=plt, turns=turns, prefix='5activation at turn')
         #plt.show()  # show plot
         
         #plt.close(fig)
@@ -387,13 +473,13 @@ class AnalyseModel:
         #self.activation_ims.append(axs)
         self.activation_ims.append(ims)
     
-    def save_img(self, plot, turns):
-        plot.savefig(f'activation at turn[{turns}].png')
+    def save_img(self, plot, prefix, turns):
+        plot.savefig(f'{prefix}[{turns}].png')
 
     def render_vid(self):
 
         #
-        plt.rcParams['animation.ffmpeg_path'] = 'D:\\Gebruikers\\Zwakenberg\\Documents\\PROJECTEN\\Python\\ffmpeg-20190930-6ca3d34-win64-static\\bin\\ffmpeg.exe'
+        plt.rcParams['animation.ffmpeg_path'] = '..\\ffmpeg-20190930-6ca3d34-win64-static\\bin\\ffmpeg.exe'
         FFwriter = animation.FFMpegWriter()
         
         ani = animation.ArtistAnimation(self.state_fig, self.state_ims, interval=200, blit=True,
