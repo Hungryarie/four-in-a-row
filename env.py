@@ -131,6 +131,10 @@ class enviroment(FiarGame):
 
         if visualize_layers:
             analyse_model = AnalyseModel(self.player1.model) # make analyse model of each layer
+            analyse_model.render_state(observation, self.turns)
+            analyse_model.get_activations(observation)
+            analyse_model.numberfy_activations(observation)
+            analyse_model.visualize_activations(observation, self.turns)
 
         while not done:
             self.block_invalid_moves(x=3)
@@ -161,9 +165,10 @@ class enviroment(FiarGame):
                 # print (f"reward: {reward}")
 
             if visualize_layers:
-                analyse_model.render_state(observation)
-                #analyse_model.numberfy_activations(observation)
-                analyse_model.visualize_activations(observation)
+                analyse_model.render_state(observation, self.turns)
+                analyse_model.get_activations(observation)
+                analyse_model.numberfy_activations(observation)
+                analyse_model.visualize_activations(observation, self.turns)
 
             if done:
                 if render:
@@ -172,6 +177,7 @@ class enviroment(FiarGame):
                     print(f"Episode finished after {self.turns} timesteps")
                     print("\n")
                 if visualize_layers:
-                    analyse_model.render_vid()
+                    pass
+                    #analyse_model.render_vid()
                     
         return [ep_reward, ep_reward_p1, ep_reward_p2], self.winner
