@@ -7,6 +7,7 @@ from keras.layers import Dense, Dropout, Conv2D, MaxPooling2D, Activation, Flatt
 from keras.layers import Input, Add, Subtract, Lambda, concatenate, add  # functional API specific
 import keras.backend as K
 from keras.optimizers import Adam, SGD, RMSprop
+from keras import initializers
 
 from constants import *
 from game import FiarGame
@@ -45,6 +46,7 @@ class ModelLog():
             self.model1_lr = p1.model._lr
             self.model1_loss = p1.model.loss
             self.model1_acc = p1.model.metrics
+            self.model1_fin_activation = p1.model.fin_activation
         except AttributeError:
             self.model1_name = 'n/a'
             self.model1_class = 'n/a'
@@ -54,6 +56,7 @@ class ModelLog():
             self.model1_lr = 'n/a'
             self.model1_loss = 'n/a'
             self.model1_acc = 'n/a'
+            self.model1_fin_activation = 'n/a'
 
         try:
             self.model2_name = p2.model.model_name
@@ -64,6 +67,7 @@ class ModelLog():
             self.model2_lr = p2.model._lr
             self.model2_loss = p2.model.loss
             self.model2_acc = p2.model.metrics
+            self.model2_fin_activation = p2.model.fin_activation
         except AttributeError:
             self.model2_name = 'n/a'
             self.model2_class = 'n/a'
@@ -73,6 +77,7 @@ class ModelLog():
             self.model2_lr = 'n/a'
             self.model2_loss = 'n/a'
             self.model2_acc = 'n/a'
+            self.model2_fin_activation = 'n/a'
 
         try:
             self.model1_used_path = p1.model.model_used_path
@@ -109,7 +114,7 @@ class ModelLog():
         if self.log_flag is False:
             return  # do not write to file
 
-        f = open(self.logfilepath, "a+")
+        f = open(f'{self.logfilepath}.log', "a+")
 
         f.write(f"=================================================\n\n")
         f.write(f"loaded models at = {self.timenow}\n")
@@ -123,6 +128,7 @@ class ModelLog():
         f.write(f" model name = {self.model1_name}\n")
         f.write(f" model loss func = {self.model1_loss}\n")
         f.write(f" model optimizer = {self.model1_opt_name} lr={self.model1_lr}\n")
+        f.write(f" model final activation = {self.model1_fin_activation}\n")
         f.write(f" model startstamp = {self.model1_timestamp}\n")
         f.write(f" model fullname = {self.model1_fullname}\n")
         f.write(f" model used path = {self.model1_used_path}\n")
@@ -134,6 +140,7 @@ class ModelLog():
         f.write(f" model name = {self.model2_name}\n")
         f.write(f" model loss func = {self.model2_loss}\n")
         f.write(f" model optimizer = {self.model2_opt_name} lr={self.model2_lr}\n")
+        f.write(f" model final activation = {self.model2_fin_activation}\n")
         f.write(f" model startstamp = {self.model2_timestamp}\n")
         f.write(f" model fullname = {self.model2_fullname}\n")
         f.write(f" model used path = {self.model2_used_path}\n")
@@ -150,7 +157,7 @@ class ModelLog():
         if self.log_flag is False:
             return  # do not write to file
 
-        f = open(self.logfilepath, "a+")
+        f = open(f'{self.logfilepath}.log', "a+")
         f.write(f"{text}\n")
         f.close()
 
@@ -158,7 +165,7 @@ class ModelLog():
         if self.log_flag is False:
             return  # do not write to file
 
-        with open('parameters.csv', mode='a+', newline='') as parameters_file:
+        with open(f'{self.logfilepath}.csv', mode='a+', newline='') as parameters_file:
             parameter_writer = csv.writer(parameters_file, delimiter=';', quotechar='"', quoting=csv.QUOTE_MINIMAL)
 
             parameter_writer.writerow([self.timestamp, self.timenow, 1, self.player1_class, self.player1_name, self.model1_class, self.model1_name, self.model1_loss, self.model1_opt_name, self.model1_lr, self.model1_timestamp, self.model1_fullname, self.model1_used_path])
@@ -199,43 +206,65 @@ class ModifiedTensorBoard(TensorBoard):
         self._write_logs(stats, self.step)
 
 
-class load_a_model:
-    def __init__(self, path):
-        self.model = load_model(path)
-        self.target_model = load_model(path)
-        path = path[7:]  # removes subdir (models/)
-        old_modelname = path.split('_')
-        self.model.model_name = f'PreTrainedModel-{old_modelname[0]}-{old_modelname[1]}-{old_modelname[2]}-{old_modelname[3]}'
-        self.model.timestamp = int(time.time())
-        self.model.model_class = self.__class__.__name__
-        self.model.model_used_path = path
-        # temporary fix.. see issue #6
-        time.sleep(2)  # needed for batch training otherwise with 2 same models there is a possibility that they will be instanciated at the same time, which causes tensorboard to append the logfile  onto each other.
-
-
 class AnalyseModel:
-    def __init__(self, model, analyze_layers=[1, 4]):
-        """https://github.com/gabrielpierobon/cnnshapes"""
+    def __init__(self):
+        """
+        Analyse the intermediate activation outputs per given layer.
+        inspired by:
+        https://github.com/gabrielpierobon/cnnshapes"""
 
-        layer_outputs = [layer.output for layer in model.layers[analyze_layers[0]:analyze_layers[1]]]               # Extracts the outputs of the top x layers
+        self.activation_fig_name = "activation at turn"
+        self.state_fig_name = "state at turn"
+
+    def update_model(self, model, analyze_layers=[1, 2, 3]):
+        """Updates the model with new weights (for instance during training) """
+
+        #layer_outputs = [layer.output for layer in model.layers[analyze_layers[0]:analyze_layers[1]]] # Extracts the outputs of the top x layers
+        layer_outputs = [model.layers[layer_num].output for layer_num in analyze_layers]               # Extracts the outputs of the top x layers
         final_layer = model.layers[len(model.layers)-1]
         layer_outputs.append(final_layer.output)
+
         self.activation_model = FuncModel(inputs=model.input, outputs=layer_outputs)  # Creates a model that will return these outputs, given the model input
         self.activation_model.name = "analyze_activation_model"
-        self.activationlayer_names = []
 
+        # get layernames
+        self.activationlayer_names = []
         for layer in layer_outputs:
             self.activationlayer_names.append(layer.name)
-        
+
+        # other
+        self.model_name = model.model_name
+        self.n_features = []  # number of features per layer
+
+    def visual_debug_train(self, state, turns, prefix="", print_num=False, save_to_file=False):
+        """wrapper for visual debuging during training"""
+        self.get_activations(state=state)
+        #self.render_state(state=state, turns=turns)
+        self.numberfy_activations(state=state, print_num=print_num)
+        self.visualize_activations(state=state, turns=turns, save_to_file=False)
+
+        if save_to_file:
+            self.save_img(plot=plt, turns=turns, prefix=f'{prefix} activation at turn')
+
+    def visual_debug_play(self, state, turns, print_num, save_to_file=True):
+        """wrapper for visual debuging during playing"""
+        self.get_activations(state=state)
+        self.render_state(state=state, turns=turns)
+        self.numberfy_activations(state=state, print_num=print_num)
+        self.visualize_activations(state=state, turns=turns, save_to_file=save_to_file)
+
+    def reset_figs(self):
+        """resets the Pyplot Figures """
+
+        self.plt = plt
+        # setup for plotting
         self.state_fig = plt.figure()
         self.state_fig.suptitle('States')  # =actually the main title
         self.state_ims = []
 
         self.activation_fig = plt.figure()
-        self.activation_fig.suptitle('Activations')  # =actually the main title
+        self.activation_fig.suptitle(f'Activations for: {self.model_name}')  # =actually the main title
         self.activation_ims = []
-
-        self.n_features = []
 
     def render_state(self, state, turns):
         plt.ioff()                          # turn off interactive plotting mode
@@ -245,16 +274,15 @@ class AnalyseModel:
         #plt.matshow(state2)
         state2 *= 64
         state2 += 128
-        
+
         plt.figure(self.state_fig.number)           # activate statefig
         plt.title(f"state at turn: {turns}")
-        
-        im = plt.imshow(state2, aspect='auto', cmap='viridis')
+
+        im = plt.imshow(state2, aspect='equal', cmap='autumn')
 
         self.state_ims.append([im])
 
         self.save_img(plot=plt, turns=turns, prefix='state at turn')
-        
 
     def get_activations(self, state):
         """get activation layers for a given state"""
@@ -264,24 +292,26 @@ class AnalyseModel:
 
         return self.activations
 
-    def numberfy_activations(self, state):
-        activations = self.activations  # get_activations(state)
+    def numberfy_activations(self, state, print_num=False):
+        IMAGES_PER_ROW = 10
 
+        activations = self.activations  # get_activations(state)
         layer_names = self.activationlayer_names        # Names of the layers, so you can have them as part of your plot
-        images_per_row = 10
+
         n_features = []
         self.activation_mean_output = []
         for idx, (layer_name, layer_activation) in enumerate(zip(layer_names, activations)):      # Displays the feature maps
             n_features.append(layer_activation.shape[-1])                             # Number of features in the feature map
-            n_cols = (n_features[idx] // images_per_row) + 1                               # Tiles the activation channels in this matrix
+            n_cols = (n_features[idx] // IMAGES_PER_ROW) + 1                               # Tiles the activation channels in this matrix
             self.activation_mean_output.append([])
 
-            print(f'activation layer: {idx}, name: {layer_names[idx]}, total features: {n_features[idx]}')
+            if print_num:
+                print(f'activation layer: {idx}, name: {layer_names[idx]}, total features: {n_features[idx]}')
             for col in range(n_cols):                                           # Tiles each filter into a big horizontal grid
                 feature_output = {}
-                for row in range(images_per_row):
-                    
-                    node = col * images_per_row + row
+                for row in range(IMAGES_PER_ROW):
+
+                    node = col * IMAGES_PER_ROW + row
                     if node >= n_features[idx]:
                         break
 
@@ -298,38 +328,35 @@ class AnalyseModel:
                     #channel_image *= 64
                     #channel_image += 128
                     feature_output[f'node {node}'] = channel_image
-                print(f' {feature_output}')
+                if print_num:
+                    print(f' {feature_output}')
+
         self.n_features = n_features
 
-    def visualize_activations(self, state, turns):
+    def visualize_activations(self, state, turns, save_to_file):
+        IMAGES_PER_ROW = 10
+        BORDER_WIDTH = 2    # must be even!
+
         activations = self.activations  # get_activations(state)
-
-        """first_layer_activation = activations[0]
-        print(first_layer_activation.shape)
-
-        plt.matshow(first_layer_activation[0, :, :, 4], cmap='viridis')
-        plt.title(f'layer:{self.activationlayer_names[0]} => node:{4}')
-        """
         layer_names = self.activationlayer_names        # Names of the layers, so you can have them as part of your plot
 
-        images_per_row = 10
         display_grid = []
         non_conv_layers_amount = 0
 
         for idx, (layer_name, layer_activation) in enumerate(zip(layer_names, activations)):      # Displays the feature maps
-            print(f'activation: {idx}')
+            #print(f'activation layer: {idx}')
             n_features = layer_activation.shape[-1]                             # Number of features in the feature map
             #size = layer_activation.shape[1]                                    # The feature map has shape (1, size, size, n_features).
             if len(layer_activation.shape) == 4:  # eg. Convolution layer
                 size_h = layer_activation.shape[1]
                 size_w = layer_activation.shape[2]
-                n_cols = (n_features // images_per_row) + 1                               # Tiles the activation channels in this matrix
-                border_width = 2 # must be even!
-                #display_grid = np.zeros((size * n_cols, images_per_row * size))
-                display_grid.append(np.zeros(((size_h + border_width) * n_cols, images_per_row * (size_w + border_width))))
+                n_cols = (n_features // IMAGES_PER_ROW) + 1                               # Tiles the activation channels in this matrix
+
+                #display_grid = np.zeros((size * n_cols, IMAGES_PER_ROW * size))
+                display_grid.append(np.zeros(((size_h + BORDER_WIDTH) * n_cols, IMAGES_PER_ROW * (size_w + BORDER_WIDTH))))
                 for col in range(n_cols):                                           # Tiles each filter into a big horizontal grid
-                    for row in range(images_per_row):
-                        node = col * images_per_row + row
+                    for row in range(IMAGES_PER_ROW):
+                        node = col * IMAGES_PER_ROW + row
                         if node >= n_features:
                             break
 
@@ -337,12 +364,12 @@ class AnalyseModel:
                                                         :, :,
                                                         node]
                         channel_image -= channel_image.mean()                       # Post-processes the feature to make it visually palatable
-                        channel_image /= channel_image.std()
+                        channel_image /= (channel_image.std() + 0.00000001)
                         channel_image *= 64
                         channel_image += 128
                         channel_image = np.clip(channel_image, 0, 255).astype('uint8')
-                        display_grid[idx][int(border_width/2) + (border_width * col) + col * size_h : int(border_width/2) + (border_width * col) + ((col + 1) * size_h),                 # Displays the grid
-                                        int(border_width/2) + (border_width * row) + row * size_w : int(border_width/2) + (border_width * row) + ((row + 1) * size_w)] = channel_image
+                        display_grid[idx][int(BORDER_WIDTH/2) + (BORDER_WIDTH * col) + col * size_h : int(BORDER_WIDTH/2) + (BORDER_WIDTH * col) + ((col + 1) * size_h),                 # Displays the grid
+                                        int(BORDER_WIDTH/2) + (BORDER_WIDTH * row) + row * size_w : int(BORDER_WIDTH/2) + (BORDER_WIDTH * row) + ((row + 1) * size_w)] = channel_image
 
                 scale = 1. / size_w
                 scale *= 0.7
@@ -365,14 +392,10 @@ class AnalyseModel:
             shape_y.append(grid.shape[0])
 
         # activate the statefig figure
-        plt.figure(self.activation_fig.number)           
-        # setup plot
-        #self.activation_fig, axs = plt.subplots(len(display_grid),
-        #                        gridspec_kw={'hspace': 0.3},
-        #                        figsize=(scale * 0.8 * max(shape_x), scale * max(shape_y) * len(activations)))
-        #self.activation_fig.suptitle(random.randint(0,99))
-        # set shape
-        COL = 3 # nr of column in figure
+        plt.figure(self.activation_fig.number)
+
+        # set shape of plot
+        COL = 3  # nr of column in figure
         self.activation_fig.set_figheight(scale * max(shape_y) * len(activations)) 
         self.activation_fig.set_figwidth(scale * 0.8 * max(shape_x) * COL)
 
@@ -382,14 +405,14 @@ class AnalyseModel:
         axs_st = []
 
         for idx in range(len(activations)):
-            plot_id = idx*COL +1
+            plot_id = idx * COL + 1
             ax = plt.subplot(len(activations), COL, plot_id)
             axs_act.append(ax)
 
-            ax = plt.subplot(len(activations), COL, plot_id+1)
+            ax = plt.subplot(len(activations), COL, plot_id + 1)
             axs_line.append(ax)
 
-            ax = plt.subplot(len(activations), COL, plot_id+2)
+            ax = plt.subplot(len(activations), COL, plot_id + 2)
             axs_st.append(ax)
 
         ims = []
@@ -397,7 +420,7 @@ class AnalyseModel:
         for idx, ax in enumerate(axs_act):
             try:
                 #ax.plot(x, y)
-                im = ax.imshow(display_grid[idx], aspect='auto', cmap='viridis')
+                im = ax.imshow(display_grid[idx], aspect='equal', cmap='viridis')
                 ims.append(im)
                 ax.set_title(f'{layer_names[idx]}')
 
@@ -406,65 +429,69 @@ class AnalyseModel:
                 ax.set_ylim(max(shape_y), -1)
 
                 # Change major ticks to show every x and y of the input array (creating borders).
-                ax.xaxis.set_major_locator(MultipleLocator(size_w + border_width))
-                ax.yaxis.set_major_locator(MultipleLocator(size_h + border_width))
+                ax.xaxis.set_major_locator(MultipleLocator(size_w + BORDER_WIDTH))
+                ax.yaxis.set_major_locator(MultipleLocator(size_h + BORDER_WIDTH))
 
                 # Change minor ticks to show every 1
-                ax.xaxis.set_minor_locator(AutoMinorLocator(size_w + border_width))
-                ax.yaxis.set_minor_locator(AutoMinorLocator(size_h + border_width))
+                ax.xaxis.set_minor_locator(AutoMinorLocator(size_w + BORDER_WIDTH))
+                ax.yaxis.set_minor_locator(AutoMinorLocator(size_h + BORDER_WIDTH))
 
                 ax.grid(True)  # show gridlines
             except:
+                #no conv layer, for example a dense layer
                 pass
 
         for idx, ax in enumerate(axs_line):
             #ax.plot(x, y)
-            x=np.array(self.activation_mean_output[idx])
-            im = ax.plot(x, label=turns)
+            x = np.array(self.activation_mean_output[idx])
+            im, = ax.plot(x, label=turns)  # note the comma! Do no want a list, but an object. (otherwise can't create an animation)
             ims.append(im)
             ax.set_title(f'{layer_names[idx]}')
 
             #set x&y limits
             #ax.set_xlim(-1, max(self.n_features))
+            MINIMUM_Y_LIM = 0.3
+            y_lim = max(MINIMUM_Y_LIM, max(self.activation_mean_output[idx]))
             ax.set_xlim(0, self.n_features[idx])
-            ax.set_ylim(0, max(self.activation_mean_output[idx]))
+            ax.set_ylim(0, y_lim)
 
             # Change major ticks to show every #.
             ax.xaxis.set_major_locator(MultipleLocator(5))
-            ax.yaxis.set_major_locator(MultipleLocator(max(self.activation_mean_output[idx])/5))
+            ax.yaxis.set_major_locator(MultipleLocator(y_lim / 5))
 
             # Change minor ticks to show every 1
             ax.xaxis.set_minor_locator(AutoMinorLocator(5))
-            ax.yaxis.set_minor_locator(AutoMinorLocator(max(self.activation_mean_output[idx])/5))
+            ax.yaxis.set_minor_locator(AutoMinorLocator(y_lim / 5))
             ax.legend()
             ax.grid(True)  # show gridlines
-        
-        state2 = np.array(state[:,:,0])
+
+        state2 = np.array(state[:, :, 0])
         for idx, ax in enumerate(axs_st):
             #ax.plot(x, y)
-            im = ax.imshow(state2, aspect='auto', cmap='viridis')
+            im = ax.imshow(state2, aspect='equal', cmap='autumn')
             ims.append(im)
-            ax.set_title(f'{layer_names[idx]}')
+            ax.set_title(f'state at turn {turns}')
 
             #set x&y limits
             ax.set_xlim(-1, size_w)
             ax.set_ylim(size_h, -1)
 
             # Change major ticks to show every x and y of the input array (creating borders).
-            ax.xaxis.set_major_locator(MultipleLocator(size_w + border_width))
-            ax.yaxis.set_major_locator(MultipleLocator(size_h + border_width))
+            ax.xaxis.set_major_locator(MultipleLocator(size_w + BORDER_WIDTH))
+            ax.yaxis.set_major_locator(MultipleLocator(size_h + BORDER_WIDTH))
 
             # Change minor ticks to show every 1
-            ax.xaxis.set_minor_locator(AutoMinorLocator(size_w + border_width))
-            ax.yaxis.set_minor_locator(AutoMinorLocator(size_h + border_width))
+            ax.xaxis.set_minor_locator(AutoMinorLocator(size_w + BORDER_WIDTH))
+            ax.yaxis.set_minor_locator(AutoMinorLocator(size_h + BORDER_WIDTH))
 
-            ax.grid(True)  # show gridlines
+            ax.grid(False)  # show gridlines
+            break
 
         
         #im = self.state_ims[len(self.state_ims)-1]
         #ims.append(im)
-
-        self.save_img(plot=plt, turns=turns, prefix='5activation at turn')
+        if save_to_file:
+            self.save_img(plot=plt, turns=turns, prefix='activation at turn')
         #plt.show()  # show plot
         
         #plt.close(fig)
@@ -474,7 +501,7 @@ class AnalyseModel:
         self.activation_ims.append(ims)
     
     def save_img(self, plot, prefix, turns):
-        plot.savefig(f'{prefix}[{turns}].png')
+        plot.savefig(f'output/{prefix}[{turns}].png')
 
     def render_vid(self):
 
@@ -482,27 +509,52 @@ class AnalyseModel:
         plt.rcParams['animation.ffmpeg_path'] = '..\\ffmpeg-20190930-6ca3d34-win64-static\\bin\\ffmpeg.exe'
         FFwriter = animation.FFMpegWriter()
         
-        ani = animation.ArtistAnimation(self.state_fig, self.state_ims, interval=200, blit=True,
-                                        repeat_delay=1000)
-        ani.save('state.mp4', writer=FFwriter)
+        ani = animation.ArtistAnimation(self.state_fig, self.state_ims, interval=1500, blit=True,
+                                        repeat_delay=5000)
+        ani.save('output/state.mp4', writer=FFwriter)
         #ani.save('dynamic_images.mpg')
 
-        ani = animation.ArtistAnimation(self.activation_fig, self.activation_ims, interval=200, blit=True,
-                                        repeat_delay=1000)
-        ani.save('activations.mp4', writer=FFwriter)
+        ani = animation.ArtistAnimation(self.activation_fig, self.activation_ims, interval=1500, blit=True,
+                                        repeat_delay=5000, )
+        ani.save('output/activations.mp4', writer=FFwriter)
+
+######################################################################################
+#
+#   # ##  ##     ###    ####    ######  #        ####
+#   #   #   #   #   #   #    #  #       #       #
+#   #   #   #   #   #   #    #  ####    #        ##
+#   #       #   #   #   #    #  #       #           #
+#   #       #    ###    ####    #####   ######  ###
+#
+######################################################################################
+
+
+class load_a_model:
+    def __init__(self, path):
+        self.model = load_model(path)
+        self.target_model = load_model(path)
+        path = path[7:]  # removes subdir (models/)
+        old_modelname = path.split('_')
+        self.model.model_name = f'PreTrainedModel-{old_modelname[0]}-{old_modelname[1]}-{old_modelname[2]}-{old_modelname[3]}'
+        self.model.timestamp = int(time.time())
+        self.model.model_class = self.__class__.__name__
+        self.model.model_used_path = path
+        # temporary fix.. see issue #6
+        time.sleep(2)  # needed for batch training otherwise with 2 same models there is a possibility that they will be instanciated at the same time, which causes tensorboard to append the logfile  onto each other.
 
 
 class model_base:
     """
     Base class for all models
     """
-    def __init__(self, input_shape, output_num, par_loss, par_opt, par_metrics, *args, **kwargs):  #par_loss="mse", par_opt=Adam(lr=0.001), par_metrics="accuracy", 
+    def __init__(self, input_shape, output_num, par_loss, par_opt, par_metrics, par_final_act, *args, **kwargs):  #par_loss="mse", par_opt=Adam(lr=0.001), par_metrics="accuracy", 
         # K.set_floatx('float64')
 
         # parameters
         self.loss = par_loss
         self.opt = par_opt
         self.metrics = par_metrics
+        self.fin_activation = par_final_act
 
         # create models
         self.model = self.create_model(input_shape, output_num)
@@ -518,15 +570,24 @@ class model_base:
         self.model._lr = K.eval(self.model.optimizer.lr)
         self.model._lr = format(self.model._lr, '.00000g')
         self.model.optimizer_name = self.model.optimizer.__class__.__name__
+        self.model.fin_activation = self.fin_activation
         #print(self.model.optimizer.get_config())
 
         # temporary fix.. see issue #6
         time.sleep(2)  # needed for batch training otherwise with 2 same models there is a possibility that they will be instanciated at the same time, which causes tensorboard to append the logfile  onto each other.
 
+    #def he_normal(self):
+    #    return initializers.he_normal(seed=None)
+
     def create_model(self, input_shape, output_num):
         pass
 
     def compile_model(self, model):
+        #if self.loss == 'huber_loss':
+        #    self.loss = tf.losses.huber_loss #self.huber_loss
+        #elif self.loss == 'huber_loss_mean':
+        #    self.loss = self.huber_loss_mean
+
         model.compile(loss=self.loss, optimizer=self.opt, metrics=[self.metrics])
 
     def append_hyperpar_to_name(self):
@@ -536,9 +597,15 @@ class model_base:
         if hasattr(self.model.optimizer, 'clipvalue'):
             clip_string += f"^clipvalue={self.model.optimizer.clipvalue}"
 
-        self.model.model_name += f'({self.loss}^{self.model.optimizer_name}^lr={self.model._lr}{clip_string})'
+        if callable(self.loss):
+            loss_name = self.loss.__name__
+        else:
+            loss_name = self.loss
 
+        self.model.model_name += f'({loss_name}^{self.model.optimizer_name}^lr={self.model._lr}{clip_string}^{self.fin_activation})'
+    """
     def huber_loss(self, y_true, y_pred, clip_delta=1.0):
+        # not easy to load model with custom loss function.
         error = y_true - y_pred
         cond = K.abs(error) <= clip_delta
 
@@ -547,6 +614,11 @@ class model_base:
 
         return K.mean(tf.where(cond, squared_loss, quadratic_loss))
 
+    def huber_loss_mean(self, y_true, y_pred, clip_delta=1.0):
+        # not easy to load model with custom loss function.
+        return K.mean(self.huber_loss(y_true, y_pred, clip_delta))
+    """
+
 
 class model1(model_base):
     def __init__(self, **kwargs):
@@ -554,6 +626,7 @@ class model1(model_base):
         kwargs['par_loss'] = kwargs.pop('par_loss', 'mse')
         kwargs['par_opt'] = kwargs.pop('par_opt', Adam(lr=0.001))
         kwargs['par_metrics'] = kwargs.pop('par_metrics', 'accuracy')
+        kwargs['par_final_act'] = kwargs.pop('par_final_act', 'softmax') 
 
         super().__init__(**kwargs)
         self.model.model_name = 'conv3x128'
@@ -567,7 +640,7 @@ class model1(model_base):
         model.add(Conv2D(128, (3, 3), padding='same', activation='relu'))
         model.add(Flatten())  # converts the 3D feature maps to 1D feature vectors
         model.add(Dense(64))
-        model.add(Dense(output_num, activation='softmax'))
+        model.add(Dense(output_num, activation=self.fin_activation))
 
         # model.compile happens in baseclass method compile_model()
         return model
@@ -579,6 +652,7 @@ class model1b(model_base):
         kwargs['par_loss'] = kwargs.pop('par_loss', 'mse')
         kwargs['par_opt'] = kwargs.pop('par_opt', Adam(lr=0.001))
         kwargs['par_metrics'] = kwargs.pop('par_metrics', 'accuracy')
+        kwargs['par_final_act'] = kwargs.pop('par_final_act', 'softmax') 
 
         super().__init__(**kwargs)
         self.model.model_name = '3xconv+2xdense'
@@ -593,7 +667,7 @@ class model1b(model_base):
         model.add(Flatten())  # converts the 3D feature maps to 1D feature vectors
         model.add(Dense(128, activation='relu'))
         model.add(Dense(64, activation='relu'))
-        model.add(Dense(output_num, activation='softmax'))
+        model.add(Dense(output_num, activation=self.fin_activation))
 
         # model.compile happens in baseclass method compile_model()
         return model
@@ -605,6 +679,7 @@ class model1c(model_base):
         kwargs['par_loss'] = kwargs.pop('par_loss', 'mse')
         kwargs['par_opt'] = kwargs.pop('par_opt', Adam(lr=0.001))
         kwargs['par_metrics'] = kwargs.pop('par_metrics', 'accuracy')
+        kwargs['par_final_act'] = kwargs.pop('par_final_act', 'softmax') 
 
         super().__init__(**kwargs)
         self.model.model_name = '3xconv+2xdenseSMALL3x3'
@@ -619,7 +694,7 @@ class model1c(model_base):
         model.add(Flatten())  # converts the 3D feature maps to 1D feature vectors
         model.add(Dense(48, activation='relu'))
         model.add(Dense(32, activation='relu'))
-        model.add(Dense(output_num, activation='softmax'))
+        model.add(Dense(output_num, activation=self.fin_activation))
 
         # model.compile happens in baseclass method compile_model()
         return model
@@ -633,6 +708,7 @@ class model1d(model_base):
         kwargs['par_loss'] = kwargs.pop('par_loss', 'mse')
         kwargs['par_opt'] = kwargs.pop('par_opt', Adam(lr=0.001))
         kwargs['par_metrics'] = kwargs.pop('par_metrics', 'accuracy')
+        kwargs['par_final_act'] = kwargs.pop('par_final_act', 'softmax') 
 
         super().__init__(**kwargs)
         self.model.model_name = '3xconv+2xdenseSMALL4x4(seq)'
@@ -647,7 +723,7 @@ class model1d(model_base):
         model.add(Flatten())  # converts the 3D feature maps to 1D feature vectors
         model.add(Dense(48, activation='relu'))
         model.add(Dense(32, activation='relu'))
-        model.add(Dense(output_num, activation='softmax'))
+        model.add(Dense(output_num, activation=self.fin_activation))
 
         # model.compile happens in baseclass method compile_model()
         return model
@@ -669,6 +745,7 @@ class func_model1(model_base):
         kwargs['par_loss'] = kwargs.pop('par_loss', 'mse')
         kwargs['par_opt'] = kwargs.pop('par_opt', Adam(lr=0.001))
         kwargs['par_metrics'] = kwargs.pop('par_metrics', 'accuracy')
+        kwargs['par_final_act'] = kwargs.pop('par_final_act', 'softmax') 
 
         super().__init__(**kwargs)
         self.model.model_name = '3xconv+2xdenseSMALL4x4(func)'
@@ -685,7 +762,7 @@ class func_model1(model_base):
         x = Flatten()(x)
         x = Dense(48, activation='relu')(x)
         x = Dense(32, activation='relu')(x)
-        predictions = Dense(output_num, activation='softmax')(x)
+        predictions = Dense(output_num, activation=self.fin_activation)(x)
 
         # This creates a model that includes
         #  the Input layer and the stacked output layers
@@ -716,6 +793,9 @@ class func_model_duel1b(model_base):
     """
 
     def __init__(self, **kwargs):
+        #defaults keyword arguments
+        kwargs['par_final_act'] = kwargs.pop('par_final_act', 'linear')
+
         super().__init__(**kwargs)
         self.model.model_name = 'dueling_3xconv+2xdenseSMALL4x4'
         self.append_hyperpar_to_name()
@@ -732,8 +812,8 @@ class func_model_duel1b(model_base):
         x = Dense(48, activation='relu')(x)
         x = Dense(32, activation='relu')(x)
 
-        value = Dense(1, activation='linear')(x)
-        advantage = Dense(output_num, activation='linear')(x)
+        value = Dense(1, activation=self.fin_activation)(x)
+        advantage = Dense(output_num, activation=self.fin_activation)(x)
         mean = Lambda(lambda x: K.mean(x, axis=1, keepdims=True))(advantage)
         advantage = Subtract()([advantage, mean])
         predictions = Add()([value, advantage])
@@ -760,6 +840,9 @@ class func_model_duel1b1(model_base):
     """
 
     def __init__(self, **kwargs):
+        #defaults keyword arguments
+        kwargs['par_final_act'] = kwargs.pop('par_final_act', 'linear')
+
         super().__init__(**kwargs)
         self.model.model_name = f'dueling_3xconv+2xdenseSMALL4x4+extra dense Functmethod1'
         self.append_hyperpar_to_name()
@@ -777,10 +860,10 @@ class func_model_duel1b1(model_base):
         x = Dense(48, activation='relu')(x)
 
         value = Dense(32, activation='relu')(x)
-        value = Dense(1, activation='linear')(value)
+        value = Dense(1, activation=self.fin_activation)(value)
 
         advantage = Dense(32, activation='relu')(x)
-        advantage = Dense(output_num, activation='linear')(advantage)
+        advantage = Dense(output_num, activation=self.fin_activation)(advantage)
         mean = Lambda(lambda x: K.mean(x, axis=1, keepdims=True))(advantage)
         advantage = Subtract()([advantage, mean])
 
@@ -803,6 +886,9 @@ class func_model_duel1b2(model_base):
     -par_loss='categorical_crossentropy', par_opt=SGD(lr=0.001, momentum=0.9) => creates around 900 eps NaN
     """
     def __init__(self, **kwargs):
+        #defaults keyword arguments
+        kwargs['par_final_act'] = kwargs.pop('par_final_act', 'linear')
+
         super().__init__(**kwargs)
         self.model.model_name = 'dueling_3xconv+2xdenseSMALL4x4+extra dense Functmethod2'
         self.append_hyperpar_to_name()
@@ -821,12 +907,12 @@ class func_model_duel1b2(model_base):
 
         # network separate state value and advantages
         value_fc = Dense(32, activation='relu')(x)
-        value = Dense(1, activation='linear')(value_fc)
+        value = Dense(1, activation=self.fin_activation)(value_fc)
         value = Lambda(lambda s: K.expand_dims(s[:, 0], -1),
                        output_shape=(output_num,))(value)
 
         advantage_fc = Dense(32, activation='relu')(x)
-        advantage = Dense(output_num, activation='linear')(advantage_fc)
+        advantage = Dense(output_num, activation=self.fin_activation)(advantage_fc)
         advantage = Lambda(lambda a: a[:, :] - K.mean(a[:, :], keepdims=True),
                            output_shape=(output_num,))(advantage)
 
@@ -845,6 +931,7 @@ class model2(model_base):
         kwargs['par_loss'] = kwargs.pop('par_loss', 'mse')
         kwargs['par_opt'] = kwargs.pop('par_opt', Adam(lr=0.001))
         kwargs['par_metrics'] = kwargs.pop('par_metrics', 'accuracy')
+        kwargs['par_final_act'] = kwargs.pop('par_final_act', 'softmax')
 
         super().__init__(**kwargs)
         self.model.model_name = 'dense1x64'
@@ -856,7 +943,7 @@ class model2(model_base):
         model.add(Flatten())  # converts the 3D feature maps to 1D feature vectors
         model.add(Dense(64, input_shape=input_shape, activation='relu'))
         
-        model.add(Dense(output_num, activation='softmax'))
+        model.add(Dense(output_num, activation=self.fin_activation))
         # model.compile happens in baseclass method compile_model()
         return model
 
@@ -867,6 +954,7 @@ class model3(model_base):
         kwargs['par_loss'] = kwargs.pop('par_loss', 'mse')
         kwargs['par_opt'] = kwargs.pop('par_opt', Adam(lr=0.001))
         kwargs['par_metrics'] = kwargs.pop('par_metrics', 'accuracy')
+        kwargs['par_final_act'] = kwargs.pop('par_final_act', 'softmax')
 
         super().__init__(**kwargs)
         self.model.model_name = 'dense2x64'
@@ -879,7 +967,7 @@ class model3(model_base):
         model.add(Dense(64, input_shape=input_shape, activation='relu'))
         model.add(Dense(64, activation='relu'))
         
-        model.add(Dense(output_num, activation='softmax'))
+        model.add(Dense(output_num, activation=self.fin_activation))
         # model.compile happens in baseclass method compile_model()
         return model
 
@@ -894,6 +982,7 @@ class model4a(model_base):
         kwargs['par_loss'] = kwargs.pop('par_loss', 'mse')
         kwargs['par_opt'] = kwargs.pop('par_opt', Adam(lr=0.001))
         kwargs['par_metrics'] = kwargs.pop('par_metrics', 'accuracy')
+        kwargs['par_final_act'] = kwargs.pop('par_final_act', 'softmax')
 
         super().__init__(**kwargs)
         self.model.model_name = 'dense2x128(softmax)(flattenLAST)'
@@ -906,7 +995,7 @@ class model4a(model_base):
         model.add(Dense(128, activation='relu'))
         model.add(Flatten())  # converts the 3D feature maps to 1D feature vectors
 
-        model.add(Dense(output_num, activation='softmax'))
+        model.add(Dense(output_num, activation=self.fin_activation))
         # model.compile happens in baseclass method compile_model()
         return model
 
@@ -924,6 +1013,7 @@ class model4b(model_base):
         kwargs['par_loss'] = kwargs.pop('par_loss', 'mse')
         kwargs['par_opt'] = kwargs.pop('par_opt', Adam(lr=0.001))
         kwargs['par_metrics'] = kwargs.pop('par_metrics', 'accuracy')
+        kwargs['par_final_act'] = kwargs.pop('par_final_act', 'softmax')
 
         super().__init__(**kwargs)
         self.model.model_name = 'dense2x128(softmax)(flattenfirst)'
@@ -936,7 +1026,7 @@ class model4b(model_base):
         model.add(Dense(128, activation='relu'))
         model.add(Dense(128, activation='relu'))
 
-        model.add(Dense(output_num, activation='softmax'))
+        model.add(Dense(output_num, activation=self.fin_activation))
         # model.compile happens in baseclass method compile_model()
         return model
 
@@ -948,6 +1038,7 @@ class model5(model_base):
         kwargs['par_loss'] = kwargs.pop('par_loss', 'mse')
         kwargs['par_opt'] = kwargs.pop('par_opt', Adam(lr=0.001))
         kwargs['par_metrics'] = kwargs.pop('par_metrics', 'accuracy')
+        kwargs['par_final_act'] = kwargs.pop('par_final_act', 'softmax')
 
         super().__init__(**kwargs)
         self.model.model_name = 'dense4x64'
@@ -963,25 +1054,29 @@ class model5(model_base):
         model.add(Dense(64, activation='relu'))
         model.add(Dense(64, activation='relu'))
 
-        model.add(Dense(output_num, activation='softmax'))
+        model.add(Dense(output_num, activation=self.fin_activation))
         # model.compile happens in baseclass method compile_model()
         return model
 
+
 class func_model5(model_base):
     """model (using functional Keras API)
-    dense4x128
+    dense4x64
 
     Good hyperparameters:
-    -
+    -par_loss='huber_loss_mean', par_opt=Adam(lr=0.001), par_metrics='accuracy', par_final_act='linear'
 
     Medium hyperparameters:
-    -
+    -par_loss='huber_loss', par_opt=Adam(lr=0.001), par_metrics='accuracy', par_final_act='linear'
 
     Bad hyperparameters:
-    -
+    -par_loss='mse', par_opt=Adam(lr=0.001), par_metrics='accuracy', par_final_act='linear'
     """
 
     def __init__(self, **kwargs):
+        #defaults keyword arguments
+        kwargs['par_final_act'] = kwargs.pop('par_final_act', 'softmax')
+
         super().__init__(**kwargs)
         self.model.model_name = 'func_dense4x64'
         self.append_hyperpar_to_name()
@@ -991,12 +1086,12 @@ class func_model5(model_base):
         inputs = Input(shape=input_shape)
 
         x = Flatten()(inputs) # converts the 3D feature maps to 1D feature vectors
-        x = Dense(64, activation='relu')(x)
-        x = Dense(64, activation='relu')(x)
-        x = Dense(64, activation='relu')(x)
-        x = Dense(64, activation='relu')(x)
+        x = Dense(64, activation='relu', kernel_initializer='he_normal')(x)
+        x = Dense(64, activation='relu', kernel_initializer='he_normal')(x)
+        x = Dense(64, activation='relu', kernel_initializer='he_normal')(x)
+        x = Dense(64, activation='relu', kernel_initializer='he_normal')(x)
 
-        predictions = Dense(output_num, activation='softmax')(x)
+        predictions = Dense(output_num, activation=self.fin_activation)(x)
         model = FuncModel(inputs=inputs, outputs=predictions)
         # model.compile happens in baseclass method compile_model()
         return model
@@ -1010,13 +1105,17 @@ class func_model5_duel1(model_base):
     -
 
     Medium hyperparameters:
-    -par_loss='mse', par_opt=Adam(lr=0.001)
+    -par_loss='huber_loss', par_opt=Adam(lr=0.001), par_metrics='accuracy', par_final_act='linear'
+    -par_loss='huber_loss_mean', par_opt=Adam(lr=0.001), par_metrics='accuracy', par_final_act='linear' 
 
     Bad hyperparameters:
-    -
+    -par_loss='mse', par_opt=Adam(lr=0.001), par_metrics='accuracy', par_final_act='linear'
     """
 
     def __init__(self, **kwargs):
+        #defaults keyword arguments
+        kwargs['par_final_act'] = kwargs.pop('par_final_act', 'linear')
+
         super().__init__(**kwargs)
         self.model.model_name = 'dueling_dense4x64'
         self.append_hyperpar_to_name()
@@ -1026,13 +1125,13 @@ class func_model5_duel1(model_base):
         inputs = Input(shape=input_shape)
 
         x = Flatten()(inputs) # converts the 3D feature maps to 1D feature vectors
-        x = Dense(64, activation='relu')(x)
-        x = Dense(64, activation='relu')(x)
-        x = Dense(64, activation='relu')(x)
-        x = Dense(64, activation='relu')(x)
+        x = Dense(64, activation='relu', kernel_initializer='he_normal')(x)
+        x = Dense(64, activation='relu', kernel_initializer='he_normal')(x)
+        x = Dense(64, activation='relu', kernel_initializer='he_normal')(x)
+        x = Dense(64, activation='relu', kernel_initializer='he_normal')(x)
 
-        value = Dense(1, activation='linear')(x)
-        advantage = Dense(output_num, activation='linear')(x)
+        value = Dense(1, activation=self.fin_activation)(x)
+        advantage = Dense(output_num, activation=self.fin_activation)(x)
         mean = Lambda(lambda x: K.mean(x, axis=1, keepdims=True))(advantage)
         advantage = Subtract()([advantage, mean])
         predictions = Add()([value, advantage])
