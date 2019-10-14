@@ -9,6 +9,7 @@ from collections import deque
 from model import ModifiedTensorBoard
 import time
 from constants import *
+import game
 
 
 class Player:
@@ -91,7 +92,7 @@ class DDQNPlayer(Player):
         # An array with last n steps for training
         self.replay_memory = deque(maxlen=REPLAY_MEMORY_SIZE)
 
-    def setup_for_training(self, description=None):
+    def setup_for_training(self, description=None, dir='logs'):
         """
         Only run this once per trainingsession.
         Not needed for using the model+agent (it will create an unnecessary tensorboard logfile).
@@ -105,12 +106,12 @@ class DDQNPlayer(Player):
             else:
                 description = ""
             # setup custom tensorboard object
-            self.tensorboard = ModifiedTensorBoard(log_dir=f"logs/{self.model.model_class}-{self.model.model_name}-{self.model.timestamp}{description}")
+            self.tensorboard = ModifiedTensorBoard(log_dir=f"{dir}/{self.model.model_class}-{self.model.model_name}-{self.model.timestamp}{description}")
 
             # Used to count when to update target network with main network's weights
             self.target_update_counter = 0
 
-            # flag for NaN as model outputs 
+            # flag for NaN as model outputs
             self.got_NaNs = False
 
             self.setup = True
@@ -129,6 +130,24 @@ class DDQNPlayer(Player):
         Adds step's data to a memory replay array"""
         # (observation space, action, reward, new observation space, done)
         self.replay_memory.append(transition)
+
+    def analyse_replay_memory(self):
+        output = [self.replay_memory[i] for i in range(0,len(self.replay_memory))]
+        rewardss = [i[2] for i in output]
+        count_REWARD_WINNING = rewardss.count(game.FiarGame.REWARD_WINNING)
+        count_REWARD_LOSING = rewardss.count(game.FiarGame.REWARD_LOSING)
+        count_REWARD_TIE = rewardss.count(game.FiarGame.REWARD_TIE)
+        count_REWARD_INVALID_MOVE = rewardss.count(game.FiarGame.REWARD_INVALID_MOVE)
+        count_REWARD_STEP = rewardss.count(game.FiarGame.REWARD_STEP)
+
+        counts = {}
+        counts['win'] = count_REWARD_WINNING
+        counts['lose'] = count_REWARD_LOSING
+        counts['tie'] = count_REWARD_TIE
+        counts['invalid move'] = count_REWARD_INVALID_MOVE
+        counts['step'] = count_REWARD_STEP
+
+        return counts
 
     def train(self, terminal_state, step):
         """
@@ -167,7 +186,11 @@ class DDQNPlayer(Player):
             # almost like with Q Learning, but we use just part of equation here
             if not done:
                 max_future_q = np.max(future_qs_list[index])
-                new_q = reward + DISCOUNT * max_future_q
+                mean_future_q = np.max(future_qs_list[index])
+                if reward >= 0:
+                    new_q = reward + DISCOUNT * max_future_q
+                elif reward < 0:
+                    new_q = reward + DISCOUNT * mean_future_q
             else:
                 new_q = reward  # no further max_future_q possible, because done=True
 
@@ -177,7 +200,7 @@ class DDQNPlayer(Player):
 
             # And append to our training data
             X.append(current_state)  # features = state
-            y.append(current_qs)    # labels = actions
+            y.append(current_qs)    # labels = action values
 
         # Fit on all samples as one batch, log only on terminal state
         # normilize function instead of /255 do: /2
@@ -245,7 +268,7 @@ class DDQNPlayer(Player):
 
             # And append to our training data
             X.append(current_state)  # features = state
-            y.append(current_qs)    # labels = actions
+            y.append(current_qs)    # labels = action values
 
         # Fit on all samples as one batch, log only on terminal state
         # normilize function instead of /255 do: /2
@@ -260,11 +283,31 @@ class DDQNPlayer(Player):
             self.target_model.set_weights(self.model.get_weights())
             self.target_update_counter = 0  # reset
 
-    def get_prob_action(self, state):
-        # 2do:
-        pass
-        prop_out_list = self.get_qs(state)
-        # random.random()
+    def get_prob_action(self, state, actionspace, tau=0.5, clip=(-1000, 300.)):
+        """Boltzmann equation"""
+        assert len(actionspace) >= 1
+        q_values = self.get_qs(state)
+        tau = 0.0000000001 if tau == 0 else tau
+        nb_actions = q_values.shape[0]
+
+        clipped_val = np.clip(q_values, clip[0], clip[1])
+        exp = clipped_val / tau
+        exp = np.clip(exp, -500, 500) # otherwise inf when passing in to big numbers
+        exp_values = np.exp(exp)
+
+        # set probability to zero for all blocked actions
+        no_action = np.arange(nb_actions).astype(int)
+        no_action = np.delete(no_action, actionspace)
+        exp_values[no_action] = 0
+
+        #calculate probability
+        try:
+            probs = exp_values / np.sum(exp_values)
+            action = np.random.choice(range(nb_actions), p=probs)
+        except:
+            action = np.random.choice(actionspace)
+
+        return action
 
     def inverse_state(self, state):
         """swap the player_id in the playingfield/state"""
