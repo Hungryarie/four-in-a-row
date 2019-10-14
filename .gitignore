@@ -26,6 +26,7 @@ test*
 *.log
 log/
 logs/
+logs(debug)/
 
 # ignore csv
 *.csv
