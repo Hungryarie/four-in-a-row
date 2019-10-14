@@ -8,6 +8,7 @@ import matplotlib.pyplot as plt
 import players
 from game import FiarGame
 from model import AnalyseModel
+import logging
 
 
 class enviroment(FiarGame):
@@ -50,6 +51,9 @@ class enviroment(FiarGame):
         return np.random.choice(self.action_space)
 
     def reward(self, reward_clipping=False):
+        #reward = 0
+        #reward_p1 = 0
+        #reward_p2 = 0
         reward = self.REWARD_STEP
         if self.active_player.player_id == self.player1.player_id:
             reward_p1 = self.REWARD_STEP
@@ -81,7 +85,7 @@ class enviroment(FiarGame):
             reward = self.reward_clipping(reward)
             reward_p1 = self.reward_clipping(reward_p1)
             reward_p2 = self.reward_clipping(reward_p2)
-        
+
         return [reward, reward_p1, reward_p2]
 
     def reward_clipping(self, reward):
@@ -90,7 +94,7 @@ class enviroment(FiarGame):
         if reward > 0:
             reward = 1
         return reward
-    
+
     def step(self, action):
         """
         returns
@@ -109,9 +113,9 @@ class enviroment(FiarGame):
         if isinstance(self._invalid_move_action, int) and self._invalid_move_count > x and self._invalid_move_played is True:
             try:
                 self.action_space.remove(self._invalid_move_action)
-                print(f"block action:{self._invalid_move_action} from trying")
-            except:
-                print('trying to remove item from list that does not excist.')
+                logging.warning(f"block action:{self._invalid_move_action} from trying")
+            except Exception:
+                logging.error('trying to remove item from list that does not excist.')
 
     def info(self):
         dicti = {"active_player": self.active_player.name,
@@ -130,11 +134,12 @@ class enviroment(FiarGame):
         observation, ep_reward, done = self.reset(), False, 0
 
         if visualize_layers:
-            analyse_model = AnalyseModel(self.player1.model) # make analyse model of each layer
-            analyse_model.render_state(observation, self.turns)
-            analyse_model.get_activations(observation)
-            analyse_model.numberfy_activations(observation)
-            analyse_model.visualize_activations(observation, self.turns)
+            analyse_model = AnalyseModel()  # make analyse model of each layer
+            analyse_model.update_model(self.player1.model)
+            analyse_model.reset_figs()
+
+            # visualize first turn:
+            analyse_model.visual_debug_play(state=observation, turns=self.turns, print_num=True)
 
         while not done:
             self.block_invalid_moves(x=3)
@@ -165,10 +170,7 @@ class enviroment(FiarGame):
                 # print (f"reward: {reward}")
 
             if visualize_layers:
-                analyse_model.render_state(observation, self.turns)
-                analyse_model.get_activations(observation)
-                analyse_model.numberfy_activations(observation)
-                analyse_model.visualize_activations(observation, self.turns)
+                analyse_model.visual_debug_play(state=observation, turns=self.turns, print_num=True)
 
             if done:
                 if render:
@@ -177,7 +179,6 @@ class enviroment(FiarGame):
                     print(f"Episode finished after {self.turns} timesteps")
                     print("\n")
                 if visualize_layers:
-                    pass
-                    #analyse_model.render_vid()
+                    analyse_model.render_vid()
                     
         return [ep_reward, ep_reward_p1, ep_reward_p2], self.winner
