@@ -47,13 +47,13 @@ class enviroment(FiarGame):
         """
         returns a random action from the actionspace.
         """
-        #return random.randint(0, self.action_space_n - 1)
+        # return random.randint(0, self.action_space_n - 1)
         return np.random.choice(self.action_space)
 
     def reward(self, reward_clipping=False):
-        #reward = 0
-        #reward_p1 = 0
-        #reward_p2 = 0
+        # reward = 0
+        # reward_p1 = 0
+        # reward_p2 = 0
         reward = self.REWARD_STEP
         if self.active_player.player_id == self.player1.player_id:
             reward_p1 = self.REWARD_STEP
@@ -127,7 +127,7 @@ class enviroment(FiarGame):
         test out 1 game.
         default the render=False.
         outputs: episode reward, winner-id
-        """       
+        """
         ep_reward = 0
         ep_reward_p1 = 0
         ep_reward_p2 = 0
@@ -142,7 +142,7 @@ class enviroment(FiarGame):
             analyse_model.visual_debug_play(state=observation, turns=self.turns, print_num=True)
 
         while not done:
-            self.block_invalid_moves(x=3)
+            self.block_invalid_moves(x=1)
 
             if render:
                 print(f"> Turn: {self.active_player.name} ({self.active_player.color})")
@@ -160,10 +160,10 @@ class enviroment(FiarGame):
             if render:
                 print(f'chosen action: {action}')
                 self.render()
-                #self.playingField = self.active_player.inverse_state(self.playingField)
-                #print('>> swap player colors:')
-                #self.render()
-                #self.playingField = self.active_player.inverse_state(self.playingField)
+                # self.playingField = self.active_player.inverse_state(self.playingField)
+                # print('>> swap player colors:')
+                # self.render()
+                # self.playingField = self.active_player.inverse_state(self.playingField)
                 print('\n')
 
                 # print(observation)
@@ -174,11 +174,11 @@ class enviroment(FiarGame):
 
             if done:
                 if render:
-                    #self.render()
+                    # self.render()
                     print(self.Winnerinfo())
                     print(f"Episode finished after {self.turns} timesteps")
                     print("\n")
                 if visualize_layers:
                     analyse_model.render_vid()
-                    
+
         return [ep_reward, ep_reward_p1, ep_reward_p2], self.winner
