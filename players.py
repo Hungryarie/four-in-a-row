@@ -59,7 +59,7 @@ class Drunk(Player):
     """
     def select_cell(self, board, state, actionspace, **kwargs):
         # return random.randint(0,np.size(board,1)-1)
-        #return random.randint(min(actionspace), max(actionspace))
+        # return random.randint(min(actionspace), max(actionspace))
         return np.random.choice(actionspace)
 
     def learn(self, **kwargs):
@@ -82,7 +82,7 @@ class DDQNPlayer(Player):
 
         self.setup = False
 
-         # check on which player-id the model was trained
+        # check on which player-id the model was trained
         if self.model.model_class == 'load_a_model':
             self.model_used_path = self.model.model_used_path.split('_')
             self.model_trained_on_player_id = self.find_model_player_id(self.model_used_path[2][10:], self.model.model_class)
@@ -132,7 +132,7 @@ class DDQNPlayer(Player):
         self.replay_memory.append(transition)
 
     def analyse_replay_memory(self):
-        output = [self.replay_memory[i] for i in range(0,len(self.replay_memory))]
+        output = [self.replay_memory[i] for i in range(0, len(self.replay_memory))]
         rewardss = [i[2] for i in output]
         count_REWARD_WINNING = rewardss.count(game.FiarGame.REWARD_WINNING)
         count_REWARD_LOSING = rewardss.count(game.FiarGame.REWARD_LOSING)
@@ -292,7 +292,7 @@ class DDQNPlayer(Player):
 
         clipped_val = np.clip(q_values, clip[0], clip[1])
         exp = clipped_val / tau
-        exp = np.clip(exp, -500, 500) # otherwise inf when passing in to big numbers
+        exp = np.clip(exp, -500, 500)  # otherwise inf when passing in too big numbers
         exp_values = np.exp(exp)
 
         # set probability to zero for all blocked actions
@@ -300,11 +300,13 @@ class DDQNPlayer(Player):
         no_action = np.delete(no_action, actionspace)
         exp_values[no_action] = 0
 
-        #calculate probability
+        # calculate probability
         try:
             probs = exp_values / np.sum(exp_values)
             action = np.random.choice(range(nb_actions), p=probs)
-        except:
+        except RuntimeWarning:
+            action = np.random.choice(actionspace)
+        except ValueError:
             action = np.random.choice(actionspace)
 
         return action
