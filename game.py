@@ -3,11 +3,11 @@ import random
 
 
 class FiarGame:
-    REWARD_WINNING = 200  # 20
-    REWARD_LOSING = -100  #-10
-    REWARD_TIE = -100  # -5
-    REWARD_INVALID_MOVE = -10  # -0.5
-    REWARD_STEP = -5  # -0.5
+    REWARD_WINNING = 100  # 200  # 20
+    REWARD_LOSING = -100  #-100  #-10
+    REWARD_TIE = -99  #-99  # -5
+    REWARD_INVALID_MOVE = -10   #-50  # -10  # -0.5
+    REWARD_STEP = -5  #-5  # -0.5
 
     def __init__(self, player1, player2):
 
@@ -127,7 +127,7 @@ class FiarGame:
     def checkForWinnerDiaRight(self):
         # print("Check for a Diagnal Right Winner")
         array = self.NProtate45(self.playingField)  # skew the playingfield 45degrees
-        winner = sum(np.apply_along_axis(self.checkFourOnARow, axis=0, arr=array))  #axis=0: vertical
+        winner = sum(np.apply_along_axis(self.checkFourOnARow, axis=0, arr=array))  # axis=0: vertical
         if winner != 0:
             self.winnerhow = "Diagnal Right"
         return winner
@@ -135,7 +135,7 @@ class FiarGame:
     def checkForWinnerDiaLeft(self):
         # print("Check for a Diagnal Left Winner")
         array = self.NProtate275(self.playingField)  # skew the playingfield minus 45degrees
-        winner = sum(np.apply_along_axis(self.checkFourOnARow, axis=0, arr=array))  #axis=0: vertical
+        winner = sum(np.apply_along_axis(self.checkFourOnARow, axis=0, arr=array))  # axis=0: vertical
         if winner != 0:
             self.winnerhow = "Diagnal Left"
         return winner
@@ -182,7 +182,7 @@ class FiarGame:
         win = False
         winner = 0
         for y in x:
-            #print (y)
+            # print (y)
             if same == y and y != 0:
                 count += 1
             else:
@@ -194,11 +194,11 @@ class FiarGame:
                 break
             same = y
 
-        #print (f"x: {x} >> countsame: {count+1} >> win: {win} >> winner: {winner}")
-        return winner  #sum(x)
+        # print (f"x: {x} >> countsame: {count+1} >> win: {win} >> winner: {winner}")
+        return winner  # sum(x)
 
     def addCoin(self, inColumn, ActivePlayer):
-        #print (f"adding {ActivePlayer} coin in column {inColumn}")
+        # print (f"adding {ActivePlayer} coin in column {inColumn}")
 
         try:
             inColumn = int(inColumn)
