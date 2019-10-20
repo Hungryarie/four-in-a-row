@@ -17,6 +17,11 @@ from datetime import datetime
 import logging
 
 
+class Stats():
+    def __init__(self):
+        pass
+
+
 def trainNN(p1_model=None, p2_model=None, log_flag=True, visualize_layers=False, debug_flag=False):
     # For stats
     ep_rewards = [-20]
@@ -32,12 +37,10 @@ def trainNN(p1_model=None, p2_model=None, log_flag=True, visualize_layers=False,
         log_flag = True
         log_filename = 'parameters(debug)'
         tensorboard_dir = 'logs(debug)'
-        #logger.setLevel(logging.DEBUG)
         logging.basicConfig(level=logging.DEBUG)
     else:
         log_filename = 'parameters'
         tensorboard_dir = 'logs'
-        #logger.setLevel(logging.WARNING)
         logging.basicConfig(level=logging.WARNING)
 
     # Create models folder
@@ -47,14 +50,14 @@ def trainNN(p1_model=None, p2_model=None, log_flag=True, visualize_layers=False,
     if p1_model is None:
         # default model to use is:...
         p1_model = model5(input_shape=(6, 7, 1), output_num=7)  # (7, 6, 1)(1, 42)
-        #p1_model = load_a_model('models\dense2x128(softmax)_startstamp1567090369_episode9050__170.00max__152.60avg___95.00min__1567092303.model')
+        # p1_model = load_a_model('models\dense2x128(softmax)_startstamp1567090369_episode9050__170.00max__152.60avg___95.00min__1567092303.model')
     p1 = players.DDQNPlayer(p1_model)
     p1.name = "DDQN on training"
 
     if p2_model is None:
-        #p2_model = load_a_model('models\dense2x128(softmax)_startstamp1567090369_episode9050__170.00max__152.60avg___95.00min__1567092303.model')
-        #p2_model = load_a_model('models\model4a_dense2x128(softmax)(flattenLAST,input_shape bug gone lr=0.001)_startstamp1568020820_episode8350__170.00max__141.60avg__-45.00min_1568027932.model')
-        #p2_model = load_a_model('models\model1d_3xconv+2xdenseSMALL4x4_startstamp1568634107_episode7900__170.00max___87.30avg_-310.00min_1568639921.model')
+        # p2_model = load_a_model('models\dense2x128(softmax)_startstamp1567090369_episode9050__170.00max__152.60avg___95.00min__1567092303.model')
+        # p2_model = load_a_model('models\model4a_dense2x128(softmax)(flattenLAST,input_shape bug gone lr=0.001)_startstamp1568020820_episode8350__170.00max__141.60avg__-45.00min_1568027932.model')
+        # p2_model = load_a_model('models\model1d_3xconv+2xdenseSMALL4x4_startstamp1568634107_episode7900__170.00max___87.30avg_-310.00min_1568639921.model')
         p2 = players.Drunk()
         p2.name = "drunk"
     else:
@@ -84,12 +87,14 @@ def trainNN(p1_model=None, p2_model=None, log_flag=True, visualize_layers=False,
     count_dia_right = 0
     count_dia_left = 0
 
-    log.log_text_to_file(f"start training at: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n")
-
     # setup for training
     p2modclass = str(log.model2_class)
     p2modclass = p2modclass.replace('/', '')
-    env.player1.setup_for_training(description=f"(train1 prob-sample win100 he_normal) vs p2={log.player2_class}@{p2modclass}", dir=tensorboard_dir)
+    description = f"(train1 prob-sample win100 he_normal update5 selfplay) vs p2={log.player2_class}@{p2modclass}"
+    env.player1.setup_for_training(description=description, dir=tensorboard_dir)
+
+    log.log_text_to_file(f"Training description: {description}\n")
+    log.log_text_to_file(f"start training at: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n")
 
     # Iterate over episodes
     for episode in tqdm(range(1, EPISODES + 1), ascii=True, unit='episodes'):
@@ -108,30 +113,31 @@ def trainNN(p1_model=None, p2_model=None, log_flag=True, visualize_layers=False,
         if env.player1.got_NaNs:
             log.log_text_to_file(f"NaN as model output at episode {episode}")
             log.log_text_to_file(f"end training at: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n")
-            return  # Nan as model output. useless to continue training
+            break  # Nan as model output. useless to continue training
 
         # Reset flag and start iterating until episode ends
         done = False
         while not done:
 
-            env.block_invalid_moves(x=10) # was 3
+            env.block_invalid_moves(x=10)  # was 3
 
             if env.current_player == 1:
                 # Get action
                 if np.random.random() > epsilon:
                     # Get action from model
-                    #action = np.argmax(env.player1.get_qs(current_state))
+                    # action = np.argmax(env.player1.get_qs(current_state))
                     action_p1 = env.active_player.select_cell(board=env.playingField, state=env.GetState(), actionspace=env.action_space)
                 else:
-                    #explore!
+                    # explore!
                     if len(env.player1.replay_memory) >= MIN_REPLAY_MEMORY_SIZE:
-                        #
+                        # get probability based action
                         tau = 1 - epsilon
                         action_p1 = env.active_player.get_prob_action(state=env.playingField, actionspace=env.action_space, tau=tau)
                     else:
                         # Get random action
                         action_p1 = np.random.choice(env.action_space)
 
+                # make action
                 new_state, [_, reward_p1, _], done, _ = env.step(action_p1)
 
                 if done:
@@ -147,10 +153,14 @@ def trainNN(p1_model=None, p2_model=None, log_flag=True, visualize_layers=False,
                     step += 1
                     logging.info(f" player1 caused the invalid move at action:{env._invalid_move_action}")
 
-                #current_state = new_state
-                #step += 1
+                # current_state = new_state
+                # step += 1
             else:
+                #action_opponent = env.active_player.select_cell(board=env.playingField, state=env.GetState(), actionspace=env.action_space)
+                # selfplay
+                env.playingField = env.inactive_player.inverse_state(env.playingField)
                 action_opponent = env.active_player.select_cell(board=env.playingField, state=env.GetState(), actionspace=env.action_space)
+                env.playingField = env.inactive_player.inverse_state(env.playingField)
                 new_state, [_, reward_p1, _], done, _ = env.step(action_opponent)
 
                 if not env._invalid_move_played:
@@ -167,7 +177,6 @@ def trainNN(p1_model=None, p2_model=None, log_flag=True, visualize_layers=False,
 
             if not env._invalid_move_played:
                 env.setNextPlayer()
-            
 
             # Transform new continous state to new discrete state and count reward
             episode_reward += reward_p1
@@ -250,26 +259,19 @@ def trainNN(p1_model=None, p2_model=None, log_flag=True, visualize_layers=False,
     log.log_text_to_file(f' {model_temp_name}')
     log.log_text_to_file(f"end training at: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n")
 
-    # remove objects
-    #del p1
-    #del p2
-    #del env
-    #del log
-    #del Model
-
 
 def PlayInEnv():
     print("play in enviroment\n")
-    #Model = load_a_model('models/func_model_duel1b1_dueling_3xconv+2xdenseSMALL4x4_catCros_SGD+extra dense Functmethod1_startstamp1568924178_endtraining__170.00max__115.00avg_-280.00min_1568928710.model')
-    
-    #against drunk
-    Model = load_a_model('models/func_model5_duel1_dueling_dense4x64(huber_loss^Adam^lr=0.001^linear)_startstamp1571065917_endtraining___70.00max__-39.10avg_-270.00min_1571067735.model')
-    #against model above
-    #Model = load_a_model('models/func_model1_3xconv+2xdenseSMALL4x4(func)(mse^Adam^lr=0.001)_startstamp1569850212_episode9800__170.00max__165.40avg__150.00min_1569854021.model')
+    # Model = load_a_model('models/func_model_duel1b1_dueling_3xconv+2xdenseSMALL4x4_catCros_SGD+extra dense Functmethod1_startstamp1568924178_endtraining__170.00max__115.00avg_-280.00min_1568928710.model')
+
+    # against drunk
+    Model = load_a_model('models/func_model1_3xconv+2xdenseSMALL4x4(func)(logcosh^Adam^lr=0.01^linear)_startstamp1571331917_episode9650___65.00max__-56.90avg_-370.00min_1571343226.model')
+    # against model above
+    # Model = load_a_model('models/func_model1_3xconv+2xdenseSMALL4x4(func)(mse^Adam^lr=0.001)_startstamp1569850212_episode9800__170.00max__165.40avg__150.00min_1569854021.model')
 
     p1 = players.DDQNPlayer(Model)
     p2 = players.Human()
-    #p2 = players.DDQNPlayer(Model2)
+    # p2 = players.DDQNPlayer(Model2)
 
     p1.name = "DDQN"
     p2.name = "arnoud"
@@ -287,15 +289,15 @@ def TestInEnv():
 
     SHOW_EVERY = 50
 
-    #Model = load_a_model('models\PreLoadedModel_model4_dense2x128(softmax)_startstamp1563365714_endtraining_startstamp1563370404_episode7050____7.00max____5.23avg__-14.00min__1563372123.model')
-    #Model = load_a_model('models\dense2x128(softmax)_startstamp1567090369_episode9050__170.00max__152.60avg___95.00min__1567092303.model')
-    #Model = load_a_model('models\model4catcross_dense2x128(softmax+CatCrossEntr)_startstamp1568050818_episode9600__165.00max__136.40avg__-50.00min_1568052142.model')
-    Model = load_a_model('models\model1d_3xconv+2xdenseSMALL4x4_startstamp1568634107_episode7900__170.00max___87.30avg_-310.00min_1568639921.model')
-    #Model2 = load_a_model('models\model4a_dense2x128(softmax)(flattenLAST,input_shape bug gone lr=0.001)_startstamp1568020820_episode8350__170.00max__141.60avg__-45.00min_1568027932.model')
-    Model2 = load_a_model('models\model1d_3xconv+2xdenseSMALL4x4_startstamp1568634107_episode7900__170.00max___87.30avg_-310.00min_1568639921.model')
+    # Model = load_a_model('models\PreLoadedModel_model4_dense2x128(softmax)_startstamp1563365714_endtraining_startstamp1563370404_episode7050____7.00max____5.23avg__-14.00min__1563372123.model')
+    # Model = load_a_model('models\dense2x128(softmax)_startstamp1567090369_episode9050__170.00max__152.60avg___95.00min__1567092303.model')
+    # Model = load_a_model('models\model4catcross_dense2x128(softmax+CatCrossEntr)_startstamp1568050818_episode9600__165.00max__136.40avg__-50.00min_1568052142.model')
+    Model = load_a_model('models/model1d_3xconv+2xdenseSMALL4x4_startstamp1568634107_episode7900__170.00max___87.30avg_-310.00min_1568639921.model')
+    # Model2 = load_a_model('models\model4a_dense2x128(softmax)(flattenLAST,input_shape bug gone lr=0.001)_startstamp1568020820_episode8350__170.00max__141.60avg__-45.00min_1568027932.model')
+    Model2 = load_a_model('models/model1d_3xconv+2xdenseSMALL4x4_startstamp1568634107_episode7900__170.00max___87.30avg_-310.00min_1568639921.model')
     p1 = players.DDQNPlayer(Model)
-    #p1 = players.Drunk()
-    #p2 = players.Drunk()
+    # p1 = players.Drunk()
+    # p2 = players.Drunk()
     p2 = players.DDQNPlayer(Model2)
 
     p1.name = "trained against model"
@@ -315,7 +317,7 @@ def TestInEnv():
         rewards_history.append(rew)
         rewards_history_p1.append(rew_p1)
         rewards_history_p2.append(rew_p2)
-        #print(f"Episode {i_episode} finished with rewardpoints: {rew}")
+        # print(f"Episode {i_episode} finished with rewardpoints: {rew}")
 
         if i_episode % SHOW_EVERY == 0:
             print(f"{SHOW_EVERY} ep mean: {np.mean(rewards_history[-SHOW_EVERY:])}")
@@ -341,10 +343,18 @@ def batch_train():
     """
     #model_list.append(func_model5_duel1(input_shape=(6, 7, 1), output_num=7,
     #                  par_loss='mse', par_opt=Adam(lr=0.001), par_metrics='accuracy', par_final_act='linear'))
-    model_list.append(func_model5_duel1(input_shape=(6, 7, 1), output_num=7,
+    model_list.append(func_model1(input_shape=(6, 7, 1), output_num=7,
                       par_loss='logcosh', par_opt=Adam(lr=0.001), par_metrics='accuracy', par_final_act='linear'))
-    model_list.append(func_model_duel1b(input_shape=(6, 7, 1), output_num=7,
-                      par_loss='logcosh', par_opt=Adam(lr=0.001), par_metrics='accuracy', par_final_act='linear'))
+    model_list.append(func_model1(input_shape=(6, 7, 1), output_num=7,
+                      par_loss='logcosh', par_opt=Adam(lr=0.01), par_metrics='accuracy', par_final_act='linear'))
+    model_list.append(func_model1(input_shape=(6, 7, 1), output_num=7,
+                      par_loss='logcosh', par_opt=SGD(lr=0.001, momentum=0.9), par_metrics='accuracy', par_final_act='linear'))
+    model_list.append(func_model1(input_shape=(6, 7, 1), output_num=7,
+                      par_loss='logcosh', par_opt=SGD(lr=0.01, momentum=0.9), par_metrics='accuracy', par_final_act='linear'))
+    #model_list.append(func_model1(input_shape=(6, 7, 1), output_num=7,
+    #                  par_loss='categorical_crossentropy', par_opt=Adam(lr=0.001), clipnorm=1.0, clipvalue=0.5, par_metrics='accuracy', par_final_act='linear'))
+    #model_list.append(func_model1(input_shape=(6, 7, 1), output_num=7,
+    #                  par_loss='categorical_crossentropy', par_opt=Adam(lr=0.01), clipnorm=1.0, clipvalue=0.5, par_metrics='accuracy', par_final_act='linear'))
 
     #model_list.append(model5(input_shape=(6, 7, 1), output_num=7,
     #                  par_loss=model5.huber_loss(), par_opt=Adam(lr=0.001), par_metrics='accuracy'))
@@ -367,5 +377,5 @@ def batch_train():
 if __name__ == '__main__':
 
     #TestInEnv()
-    #PlayInEnv()
-    batch_train()
+    PlayInEnv()
+    #batch_train()
