@@ -438,7 +438,7 @@ class AnalyseModel:
 
                 ax.grid(True)  # show gridlines
             except:
-                #no conv layer, for example a dense layer
+                # no conv layer, for example a dense layer
                 pass
 
         for idx, ax in enumerate(axs_line):
@@ -472,7 +472,7 @@ class AnalyseModel:
             ims.append(im)
             ax.set_title(f'state at turn {turns}')
 
-            #set x&y limits
+            # set x&y limits
             ax.set_xlim(-1, size_w)
             ax.set_ylim(size_h, -1)
 
@@ -487,19 +487,18 @@ class AnalyseModel:
             ax.grid(False)  # show gridlines
             break
 
-        
         #im = self.state_ims[len(self.state_ims)-1]
         #ims.append(im)
         if save_to_file:
             self.save_img(plot=plt, turns=turns, prefix='activation at turn')
         #plt.show()  # show plot
-        
+
         #plt.close(fig)
         #self.activation_fig = fig
         #im = ax.imshow(display_grid[0], aspect='auto', cmap='viridis')
         #self.activation_ims.append(axs)
         self.activation_ims.append(ims)
-    
+
     def save_img(self, plot, prefix, turns):
         plot.savefig(f'output/{prefix}[{turns}].png')
 
@@ -508,11 +507,11 @@ class AnalyseModel:
         #
         plt.rcParams['animation.ffmpeg_path'] = '..\\ffmpeg-20190930-6ca3d34-win64-static\\bin\\ffmpeg.exe'
         FFwriter = animation.FFMpegWriter()
-        
+
         ani = animation.ArtistAnimation(self.state_fig, self.state_ims, interval=1500, blit=True,
                                         repeat_delay=5000)
         ani.save('output/state.mp4', writer=FFwriter)
-        #ani.save('dynamic_images.mpg')
+        # ani.save('dynamic_images.mpg')
 
         ani = animation.ArtistAnimation(self.activation_fig, self.activation_ims, interval=1500, blit=True,
                                         repeat_delay=5000, )
@@ -547,7 +546,7 @@ class model_base:
     """
     Base class for all models
     """
-    def __init__(self, input_shape, output_num, par_loss, par_opt, par_metrics, par_final_act, *args, **kwargs):  #par_loss="mse", par_opt=Adam(lr=0.001), par_metrics="accuracy", 
+    def __init__(self, input_shape, output_num, par_loss, par_opt, par_metrics, par_final_act, *args, **kwargs):
         # K.set_floatx('float64')
 
         # parameters
@@ -571,21 +570,21 @@ class model_base:
         self.model._lr = format(self.model._lr, '.00000g')
         self.model.optimizer_name = self.model.optimizer.__class__.__name__
         self.model.fin_activation = self.fin_activation
-        #print(self.model.optimizer.get_config())
+        # print(self.model.optimizer.get_config())
 
         # temporary fix.. see issue #6
         time.sleep(2)  # needed for batch training otherwise with 2 same models there is a possibility that they will be instanciated at the same time, which causes tensorboard to append the logfile  onto each other.
 
-    #def he_normal(self):
+    # def he_normal(self):
     #    return initializers.he_normal(seed=None)
 
     def create_model(self, input_shape, output_num):
         pass
 
     def compile_model(self, model):
-        #if self.loss == 'huber_loss':
+        # if self.loss == 'huber_loss':
         #    self.loss = tf.losses.huber_loss #self.huber_loss
-        #elif self.loss == 'huber_loss_mean':
+        # elif self.loss == 'huber_loss_mean':
         #    self.loss = self.huber_loss_mean
 
         model.compile(loss=self.loss, optimizer=self.opt, metrics=[self.metrics])
@@ -622,11 +621,11 @@ class model_base:
 
 class model1(model_base):
     def __init__(self, **kwargs):
-        #defaults keyword arguments
+        # defaults keyword arguments
         kwargs['par_loss'] = kwargs.pop('par_loss', 'mse')
         kwargs['par_opt'] = kwargs.pop('par_opt', Adam(lr=0.001))
         kwargs['par_metrics'] = kwargs.pop('par_metrics', 'accuracy')
-        kwargs['par_final_act'] = kwargs.pop('par_final_act', 'softmax') 
+        kwargs['par_final_act'] = kwargs.pop('par_final_act', 'softmax')
 
         super().__init__(**kwargs)
         self.model.model_name = 'conv3x128'
@@ -648,11 +647,11 @@ class model1(model_base):
 
 class model1b(model_base):
     def __init__(self, **kwargs):
-        #defaults keyword arguments
+        # defaults keyword arguments
         kwargs['par_loss'] = kwargs.pop('par_loss', 'mse')
         kwargs['par_opt'] = kwargs.pop('par_opt', Adam(lr=0.001))
         kwargs['par_metrics'] = kwargs.pop('par_metrics', 'accuracy')
-        kwargs['par_final_act'] = kwargs.pop('par_final_act', 'softmax') 
+        kwargs['par_final_act'] = kwargs.pop('par_final_act', 'softmax')
 
         super().__init__(**kwargs)
         self.model.model_name = '3xconv+2xdense'
@@ -675,11 +674,11 @@ class model1b(model_base):
 
 class model1c(model_base):
     def __init__(self, **kwargs):
-        #defaults keyword arguments
+        # defaults keyword arguments
         kwargs['par_loss'] = kwargs.pop('par_loss', 'mse')
         kwargs['par_opt'] = kwargs.pop('par_opt', Adam(lr=0.001))
         kwargs['par_metrics'] = kwargs.pop('par_metrics', 'accuracy')
-        kwargs['par_final_act'] = kwargs.pop('par_final_act', 'softmax') 
+        kwargs['par_final_act'] = kwargs.pop('par_final_act', 'softmax')
 
         super().__init__(**kwargs)
         self.model.model_name = '3xconv+2xdenseSMALL3x3'
@@ -704,11 +703,11 @@ class model1d(model_base):
     """model version made with the Sequential API
     Functional API counterpart is 'func_model1()"""
     def __init__(self, **kwargs):
-        #defaults keyword arguments
+        # defaults keyword arguments
         kwargs['par_loss'] = kwargs.pop('par_loss', 'mse')
         kwargs['par_opt'] = kwargs.pop('par_opt', Adam(lr=0.001))
         kwargs['par_metrics'] = kwargs.pop('par_metrics', 'accuracy')
-        kwargs['par_final_act'] = kwargs.pop('par_final_act', 'softmax') 
+        kwargs['par_final_act'] = kwargs.pop('par_final_act', 'softmax')
 
         super().__init__(**kwargs)
         self.model.model_name = '3xconv+2xdenseSMALL4x4(seq)'
@@ -738,14 +737,15 @@ class func_model1(model_base):
     -
 
     Bad hyperparameters:
-    -
+    -par_loss='categorical_crossentropy', par_opt=Adam(lr=0.01), clipnorm=1.0, clipvalue=0.5, par_metrics='accuracy', par_final_act='linear'
+    -par_loss='categorical_crossentropy', par_opt=Adam(lr=0.001), clipnorm=1.0, clipvalue=0.5, par_metrics='accuracy', par_final_act='linear'
     """
     def __init__(self, **kwargs):
-        #defaults keyword arguments
+        # defaults keyword arguments
         kwargs['par_loss'] = kwargs.pop('par_loss', 'mse')
         kwargs['par_opt'] = kwargs.pop('par_opt', Adam(lr=0.001))
         kwargs['par_metrics'] = kwargs.pop('par_metrics', 'accuracy')
-        kwargs['par_final_act'] = kwargs.pop('par_final_act', 'softmax') 
+        kwargs['par_final_act'] = kwargs.pop('par_final_act', 'softmax')
 
         super().__init__(**kwargs)
         self.model.model_name = '3xconv+2xdenseSMALL4x4(func)'
@@ -756,18 +756,18 @@ class func_model1(model_base):
         inputs = Input(shape=input_shape)
 
         # a layer instance is callable on a tensor, and returns a tensor
-        x = Conv2D(12, (4, 4), input_shape=input_shape, data_format="channels_last", padding='same', activation='relu')(inputs)
-        x = Conv2D(24, (4, 4), padding='same', activation='relu')(x)
-        x = Conv2D(48, (4, 4), padding='same', activation='relu')(x)
+        x = Conv2D(12, (4, 4), input_shape=input_shape, data_format="channels_last", padding='same', activation='relu', kernel_initializer='he_normal')(inputs)
+        x = Conv2D(24, (4, 4), padding='same', activation='relu', kernel_initializer='he_normal')(x)
+        x = Conv2D(48, (4, 4), padding='same', activation='relu', kernel_initializer='he_normal')(x)
         x = Flatten()(x)
-        x = Dense(48, activation='relu')(x)
-        x = Dense(32, activation='relu')(x)
-        predictions = Dense(output_num, activation=self.fin_activation)(x)
+        x = Dense(48, activation='relu', kernel_initializer='he_normal')(x)
+        x = Dense(32, activation='relu', kernel_initializer='he_normal')(x)
+        predictions = Dense(output_num, activation=self.fin_activation, kernel_initializer='he_normal')(x)
 
         # This creates a model that includes
         #  the Input layer and the stacked output layers
         model = FuncModel(inputs=inputs, outputs=predictions)
-        #model.compile(optimizer='rmsprop',
+        # model.compile(optimizer='rmsprop',
         #            loss='categorical_crossentropy',
         #            metrics=['accuracy'])
         # model.compile happens in baseclass method compile_model()
@@ -793,7 +793,7 @@ class func_model_duel1b(model_base):
     """
 
     def __init__(self, **kwargs):
-        #defaults keyword arguments
+        # defaults keyword arguments
         kwargs['par_final_act'] = kwargs.pop('par_final_act', 'linear')
 
         super().__init__(**kwargs)
@@ -805,12 +805,12 @@ class func_model_duel1b(model_base):
         inputs = Input(shape=input_shape)
 
         # a layer instance is callable on a tensor, and returns a tensor
-        x = Conv2D(12, (4, 4), input_shape=input_shape, data_format="channels_last", padding='same', activation='relu')(inputs)
-        x = Conv2D(24, (4, 4), padding='same', activation='relu')(x)
-        x = Conv2D(48, (4, 4), padding='same', activation='relu')(x)
+        x = Conv2D(12, (4, 4), input_shape=input_shape, data_format="channels_last", padding='same', activation='relu', kernel_initializer='he_normal')(inputs)
+        x = Conv2D(24, (4, 4), padding='same', activation='relu', kernel_initializer='he_normal')(x)
+        x = Conv2D(48, (4, 4), padding='same', activation='relu', kernel_initializer='he_normal')(x)
         x = Flatten()(x)
-        x = Dense(48, activation='relu')(x)
-        x = Dense(32, activation='relu')(x)
+        x = Dense(48, activation='relu', kernel_initializer='he_normal')(x)
+        x = Dense(32, activation='relu', kernel_initializer='he_normal')(x)
 
         value = Dense(1, activation=self.fin_activation)(x)
         advantage = Dense(output_num, activation=self.fin_activation)(x)
@@ -840,7 +840,7 @@ class func_model_duel1b1(model_base):
     """
 
     def __init__(self, **kwargs):
-        #defaults keyword arguments
+        # defaults keyword arguments
         kwargs['par_final_act'] = kwargs.pop('par_final_act', 'linear')
 
         super().__init__(**kwargs)
@@ -886,7 +886,7 @@ class func_model_duel1b2(model_base):
     -par_loss='categorical_crossentropy', par_opt=SGD(lr=0.001, momentum=0.9) => creates around 900 eps NaN
     """
     def __init__(self, **kwargs):
-        #defaults keyword arguments
+        # defaults keyword arguments
         kwargs['par_final_act'] = kwargs.pop('par_final_act', 'linear')
 
         super().__init__(**kwargs)
@@ -927,7 +927,7 @@ class func_model_duel1b2(model_base):
 
 class model2(model_base):
     def __init__(self, **kwargs):
-        #defaults keyword arguments
+        # defaults keyword arguments
         kwargs['par_loss'] = kwargs.pop('par_loss', 'mse')
         kwargs['par_opt'] = kwargs.pop('par_opt', Adam(lr=0.001))
         kwargs['par_metrics'] = kwargs.pop('par_metrics', 'accuracy')
@@ -942,7 +942,7 @@ class model2(model_base):
 
         model.add(Flatten())  # converts the 3D feature maps to 1D feature vectors
         model.add(Dense(64, input_shape=input_shape, activation='relu'))
-        
+
         model.add(Dense(output_num, activation=self.fin_activation))
         # model.compile happens in baseclass method compile_model()
         return model
@@ -950,7 +950,7 @@ class model2(model_base):
 
 class model3(model_base):
     def __init__(self, **kwargs):
-        #defaults keyword arguments
+        # defaults keyword arguments
         kwargs['par_loss'] = kwargs.pop('par_loss', 'mse')
         kwargs['par_opt'] = kwargs.pop('par_opt', Adam(lr=0.001))
         kwargs['par_metrics'] = kwargs.pop('par_metrics', 'accuracy')
@@ -966,7 +966,7 @@ class model3(model_base):
         model.add(Flatten())  # converts the 3D feature maps to 1D feature vectors
         model.add(Dense(64, input_shape=input_shape, activation='relu'))
         model.add(Dense(64, activation='relu'))
-        
+
         model.add(Dense(output_num, activation=self.fin_activation))
         # model.compile happens in baseclass method compile_model()
         return model
@@ -978,7 +978,7 @@ class model4a(model_base):
     -par_loss='categorical_crossentropy', par_opt=SGD(lr=0.01, momentum=0.9) # old model4catcross
     """
     def __init__(self, **kwargs):
-        #defaults keyword arguments
+        # defaults keyword arguments
         kwargs['par_loss'] = kwargs.pop('par_loss', 'mse')
         kwargs['par_opt'] = kwargs.pop('par_opt', Adam(lr=0.001))
         kwargs['par_metrics'] = kwargs.pop('par_metrics', 'accuracy')
@@ -1009,7 +1009,7 @@ class model4b(model_base):
     """
 
     def __init__(self, **kwargs):
-        #defaults keyword arguments
+        # defaults keyword arguments
         kwargs['par_loss'] = kwargs.pop('par_loss', 'mse')
         kwargs['par_opt'] = kwargs.pop('par_opt', Adam(lr=0.001))
         kwargs['par_metrics'] = kwargs.pop('par_metrics', 'accuracy')
@@ -1034,7 +1034,7 @@ class model4b(model_base):
 class model5(model_base):
     """sequential api: dense4x128"""
     def __init__(self, **kwargs):
-        #defaults keyword arguments
+        # defaults keyword arguments
         kwargs['par_loss'] = kwargs.pop('par_loss', 'mse')
         kwargs['par_opt'] = kwargs.pop('par_opt', Adam(lr=0.001))
         kwargs['par_metrics'] = kwargs.pop('par_metrics', 'accuracy')
@@ -1047,7 +1047,7 @@ class model5(model_base):
     def create_model(self, input_shape, output_num):
         model = Sequential()
 
-        #input_shape=input_shape
+        # input_shape=input_shape
         model.add(Flatten())  # converts the 3D feature maps to 1D feature vectors
         model.add(Dense(64, activation='relu'))
         model.add(Dense(64, activation='relu'))
@@ -1074,7 +1074,7 @@ class func_model5(model_base):
     """
 
     def __init__(self, **kwargs):
-        #defaults keyword arguments
+        # defaults keyword arguments
         kwargs['par_final_act'] = kwargs.pop('par_final_act', 'softmax')
 
         super().__init__(**kwargs)
@@ -1085,7 +1085,7 @@ class func_model5(model_base):
         # This returns a tensor
         inputs = Input(shape=input_shape)
 
-        x = Flatten()(inputs) # converts the 3D feature maps to 1D feature vectors
+        x = Flatten()(inputs)  # converts the 3D feature maps to 1D feature vectors
         x = Dense(64, activation='relu', kernel_initializer='he_normal')(x)
         x = Dense(64, activation='relu', kernel_initializer='he_normal')(x)
         x = Dense(64, activation='relu', kernel_initializer='he_normal')(x)
@@ -1106,14 +1106,14 @@ class func_model5_duel1(model_base):
 
     Medium hyperparameters:
     -par_loss='huber_loss', par_opt=Adam(lr=0.001), par_metrics='accuracy', par_final_act='linear'
-    -par_loss='huber_loss_mean', par_opt=Adam(lr=0.001), par_metrics='accuracy', par_final_act='linear' 
+    -par_loss='huber_loss_mean', par_opt=Adam(lr=0.001), par_metrics='accuracy', par_final_act='linear'
 
     Bad hyperparameters:
     -par_loss='mse', par_opt=Adam(lr=0.001), par_metrics='accuracy', par_final_act='linear'
     """
 
     def __init__(self, **kwargs):
-        #defaults keyword arguments
+        # defaults keyword arguments
         kwargs['par_final_act'] = kwargs.pop('par_final_act', 'linear')
 
         super().__init__(**kwargs)
@@ -1124,7 +1124,7 @@ class func_model5_duel1(model_base):
         # This returns a tensor
         inputs = Input(shape=input_shape)
 
-        x = Flatten()(inputs) # converts the 3D feature maps to 1D feature vectors
+        x = Flatten()(inputs)  # converts the 3D feature maps to 1D feature vectors
         x = Dense(64, activation='relu', kernel_initializer='he_normal')(x)
         x = Dense(64, activation='relu', kernel_initializer='he_normal')(x)
         x = Dense(64, activation='relu', kernel_initializer='he_normal')(x)
