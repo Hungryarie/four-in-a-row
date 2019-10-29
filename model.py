@@ -216,6 +216,8 @@ class AnalyseModel:
         self.activation_fig_name = "activation at turn"
         self.state_fig_name = "state at turn"
 
+        self.state_memory_list = []
+
     def update_model(self, model, analyze_layers=[1, 2, 3]):
         """Updates the model with new weights (for instance during training) """
 
@@ -340,6 +342,8 @@ class AnalyseModel:
         activations = self.activations  # get_activations(state)
         layer_names = self.activationlayer_names        # Names of the layers, so you can have them as part of your plot
 
+        self.state_memory_list.append(state)
+
         display_grid = []
         non_conv_layers_amount = 0
 
@@ -400,10 +404,11 @@ class AnalyseModel:
         self.activation_fig.set_figwidth(scale * 0.8 * max(shape_x) * COL)
 
         # make subplots in one list
-        axs_act = []
-        axs_line = []
-        axs_st = []
+        axs_act = []    # for activations visuals
+        axs_line = []   # for average activation output
+        axs_st = []     # for current state
 
+        # append empty subplots to list
         for idx in range(len(activations)):
             plot_id = idx * COL + 1
             ax = plt.subplot(len(activations), COL, plot_id)
@@ -416,7 +421,8 @@ class AnalyseModel:
             axs_st.append(ax)
 
         ims = []
-        # iterate over subplots
+        # iterate over the subplots
+        # activations subplot
         for idx, ax in enumerate(axs_act):
             try:
                 #ax.plot(x, y)
@@ -441,6 +447,7 @@ class AnalyseModel:
                 # no conv layer, for example a dense layer
                 pass
 
+        # average activation outputs subplot
         for idx, ax in enumerate(axs_line):
             #ax.plot(x, y)
             x = np.array(self.activation_mean_output[idx])
@@ -465,12 +472,17 @@ class AnalyseModel:
             ax.legend()
             ax.grid(True)  # show gridlines
 
-        state2 = np.array(state[:, :, 0])
+        # state subplot
         for idx, ax in enumerate(axs_st):
             #ax.plot(x, y)
+            i = len(self.state_memory_list) - 1 - idx
+            if i < 0:
+                break
+            state = self.state_memory_list[i]
+            state2 = np.array(state[:, :, 0])
             im = ax.imshow(state2, aspect='equal', cmap='autumn')
             ims.append(im)
-            ax.set_title(f'state at turn {turns}')
+            ax.set_title(f'state at turn {turns-idx}')
 
             # set x&y limits
             ax.set_xlim(-1, size_w)
@@ -485,7 +497,7 @@ class AnalyseModel:
             ax.yaxis.set_minor_locator(AutoMinorLocator(size_h + BORDER_WIDTH))
 
             ax.grid(False)  # show gridlines
-            break
+            #break  # only show one plot
 
         #im = self.state_ims[len(self.state_ims)-1]
         #ims.append(im)
@@ -530,10 +542,18 @@ class AnalyseModel:
 
 class load_a_model:
     def __init__(self, path):
-        self.model = load_model(path)
-        self.target_model = load_model(path)
+        try:
+            self.model = load_model(path)
+            self.target_model = load_model(path)
+        except:
+            raise NameError(f"could not open ({path}). Doesn't exist?")
+
         path = path[7:]  # removes subdir (models/)
         old_modelname = path.split('_')
+        # when old_modelname has a to short array length, append it with 'na'
+        if len(old_modelname) <= 3:
+            for i in range(len(old_modelname), 3 + 1):
+                old_modelname.append('na')
         self.model.model_name = f'PreTrainedModel-{old_modelname[0]}-{old_modelname[1]}-{old_modelname[2]}-{old_modelname[3]}'
         self.model.timestamp = int(time.time())
         self.model.model_class = self.__class__.__name__
@@ -737,8 +757,10 @@ class func_model1(model_base):
     -
 
     Bad hyperparameters:
-    -par_loss='categorical_crossentropy', par_opt=Adam(lr=0.01), clipnorm=1.0, clipvalue=0.5, par_metrics='accuracy', par_final_act='linear'
-    -par_loss='categorical_crossentropy', par_opt=Adam(lr=0.001), clipnorm=1.0, clipvalue=0.5, par_metrics='accuracy', par_final_act='linear'
+    - par_loss='logcosh', par_opt=Adam(lr=0.01), par_metrics='accuracy', par_final_act='linear' loss explosion at 600 steps
+    - par_loss='logcosh', par_opt=Adam(lr=0.001), par_metrics='accuracy', par_final_act='linear' loss explosion at 10k steps
+    - par_loss='categorical_crossentropy', par_opt=Adam(lr=0.01), clipnorm=1.0, clipvalue=0.5, par_metrics='accuracy', par_final_act='linear'
+    - par_loss='categorical_crossentropy', par_opt=Adam(lr=0.001), clipnorm=1.0, clipvalue=0.5, par_metrics='accuracy', par_final_act='linear'
     """
     def __init__(self, **kwargs):
         # defaults keyword arguments
@@ -748,7 +770,7 @@ class func_model1(model_base):
         kwargs['par_final_act'] = kwargs.pop('par_final_act', 'softmax')
 
         super().__init__(**kwargs)
-        self.model.model_name = '3xconv+2xdenseSMALL4x4(func)'
+        self.model.model_name = '3xconv+2xdenseSMALL4x4(func)-HEnormal'
         self.append_hyperpar_to_name()
 
     def create_model(self, input_shape, output_num):
@@ -844,7 +866,7 @@ class func_model_duel1b1(model_base):
         kwargs['par_final_act'] = kwargs.pop('par_final_act', 'linear')
 
         super().__init__(**kwargs)
-        self.model.model_name = f'dueling_3xconv+2xdenseSMALL4x4+extra dense Functmethod1'
+        self.model.model_name = f'dueling_3xconv+2xdenseSMALL4x4+extra dense Functmethod1-HEnormal'
         self.append_hyperpar_to_name()
 
     def create_model(self, input_shape, output_num):
@@ -852,18 +874,18 @@ class func_model_duel1b1(model_base):
         inputs = Input(shape=input_shape)
 
         # a layer instance is callable on a tensor, and returns a tensor
-        x = Conv2D(12, (4, 4), input_shape=input_shape, data_format="channels_last", padding='same', activation='relu')(inputs)
-        x = Conv2D(24, (4, 4), padding='same', activation='relu')(x)
-        x = Conv2D(48, (4, 4), padding='same', activation='relu')(x)
+        x = Conv2D(12, (4, 4), input_shape=input_shape, data_format="channels_last", padding='same', activation='relu', kernel_initializer='he_normal')(inputs)
+        x = Conv2D(24, (4, 4), padding='same', activation='relu', kernel_initializer='he_normal')(x)
+        x = Conv2D(48, (4, 4), padding='same', activation='relu', kernel_initializer='he_normal')(x)
         x = Flatten()(x)
-        x = Dense(64, activation='relu')(x)
-        x = Dense(48, activation='relu')(x)
+        x = Dense(64, activation='relu', kernel_initializer='he_normal')(x)
+        x = Dense(48, activation='relu', kernel_initializer='he_normal')(x)
 
-        value = Dense(32, activation='relu')(x)
-        value = Dense(1, activation=self.fin_activation)(value)
+        value = Dense(32, activation='relu', kernel_initializer='he_normal')(x)
+        value = Dense(1, activation=self.fin_activation, kernel_initializer='he_normal')(value)
 
-        advantage = Dense(32, activation='relu')(x)
-        advantage = Dense(output_num, activation=self.fin_activation)(advantage)
+        advantage = Dense(32, activation='relu', kernel_initializer='he_normal')(x)
+        advantage = Dense(output_num, activation=self.fin_activation, kernel_initializer='he_normal')(advantage)
         mean = Lambda(lambda x: K.mean(x, axis=1, keepdims=True))(advantage)
         advantage = Subtract()([advantage, mean])
 
@@ -883,14 +905,15 @@ class func_model_duel1b2(model_base):
     -
 
     Bad hyperparameters:
-    -par_loss='categorical_crossentropy', par_opt=SGD(lr=0.001, momentum=0.9) => creates around 900 eps NaN
+    - par_loss='logcosh', par_opt=Adam(lr=0.001), par_metrics='accuracy', par_final_act='linear' loss explosion at 600 steps
+    - par_loss='categorical_crossentropy', par_opt=SGD(lr=0.001, momentum=0.9) => creates around 900 eps NaN
     """
     def __init__(self, **kwargs):
         # defaults keyword arguments
         kwargs['par_final_act'] = kwargs.pop('par_final_act', 'linear')
 
         super().__init__(**kwargs)
-        self.model.model_name = 'dueling_3xconv+2xdenseSMALL4x4+extra dense Functmethod2'
+        self.model.model_name = 'dueling_3xconv+2xdenseSMALL4x4+extra dense Functmethod2-HEnormal'
         self.append_hyperpar_to_name()
 
     def create_model(self, input_shape, output_num):
@@ -898,21 +921,21 @@ class func_model_duel1b2(model_base):
         inputs = Input(shape=input_shape)
 
         # a layer instance is callable on a tensor, and returns a tensor
-        x = Conv2D(12, (4, 4), input_shape=input_shape, data_format="channels_last", padding='same', activation='relu')(inputs)
-        x = Conv2D(24, (4, 4), padding='same', activation='relu')(x)
-        x = Conv2D(48, (4, 4), padding='same', activation='relu')(x)
+        x = Conv2D(12, (4, 4), input_shape=input_shape, data_format="channels_last", padding='same', activation='relu', kernel_initializer='he_normal')(inputs)
+        x = Conv2D(24, (4, 4), padding='same', activation='relu', kernel_initializer='he_normal')(x)
+        x = Conv2D(48, (4, 4), padding='same', activation='relu', kernel_initializer='he_normal')(x)
         x = Flatten()(x)
-        x = Dense(64, activation='relu')(x)
-        x = Dense(48, activation='relu')(x)
+        x = Dense(64, activation='relu', kernel_initializer='he_normal')(x)
+        x = Dense(48, activation='relu', kernel_initializer='he_normal')(x)
 
         # network separate state value and advantages
-        value_fc = Dense(32, activation='relu')(x)
+        value_fc = Dense(32, activation='relu', kernel_initializer='he_normal')(x)
         value = Dense(1, activation=self.fin_activation)(value_fc)
         value = Lambda(lambda s: K.expand_dims(s[:, 0], -1),
                        output_shape=(output_num,))(value)
 
-        advantage_fc = Dense(32, activation='relu')(x)
-        advantage = Dense(output_num, activation=self.fin_activation)(advantage_fc)
+        advantage_fc = Dense(32, activation='relu', kernel_initializer='he_normal')(x)
+        advantage = Dense(output_num, activation=self.fin_activation, kernel_initializer='he_normal')(advantage_fc)
         advantage = Lambda(lambda a: a[:, :] - K.mean(a[:, :], keepdims=True),
                            output_shape=(output_num,))(advantage)
 
@@ -1078,7 +1101,7 @@ class func_model5(model_base):
         kwargs['par_final_act'] = kwargs.pop('par_final_act', 'softmax')
 
         super().__init__(**kwargs)
-        self.model.model_name = 'func_dense4x64'
+        self.model.model_name = 'func_dense4x64-HEnormal'
         self.append_hyperpar_to_name()
 
     def create_model(self, input_shape, output_num):
@@ -1117,7 +1140,7 @@ class func_model5_duel1(model_base):
         kwargs['par_final_act'] = kwargs.pop('par_final_act', 'linear')
 
         super().__init__(**kwargs)
-        self.model.model_name = 'dueling_dense4x64'
+        self.model.model_name = 'dueling_dense4x64-HEnormal'
         self.append_hyperpar_to_name()
 
     def create_model(self, input_shape, output_num):
