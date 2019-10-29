@@ -113,9 +113,9 @@ class enviroment(FiarGame):
         if isinstance(self._invalid_move_action, int) and self._invalid_move_count > x and self._invalid_move_played is True:
             try:
                 self.action_space.remove(self._invalid_move_action)
-                logging.warning(f"block action:{self._invalid_move_action} from trying")
+                logging.info(f"block action:{self._invalid_move_action} from trying")
             except Exception:
-                logging.error('trying to remove item from list that does not excist.')
+                logging.error(f'trying to remove item ({self._invalid_move_action}) from list ({self.action_space}) that does not excist.')
 
     def info(self):
         dicti = {"active_player": self.active_player.name,
