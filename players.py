@@ -65,13 +65,106 @@ class Drunk(Player):
     def learn(self, **kwargs):
         pass
 
+from keras import Sequential
+from keras.layers import Dense, Flatten
+from keras.optimizers import Adam
+class A2CAgent(Player):
+    def __init__(self, actor_model, critic_model, *args):
+        """
+        A2C(Advantage Actor-Critic) agent\n
+        https://github.com/rlcode/reinforcement-learning/blob/master/2-cartpole/4-actor-critic/cartpole_a2c.py
+        """
+
+        super().__init__(*args)
+        # if you want to see Cartpole learning, then change to True
+        self.render = False
+        # get size of state and action
+        self.action_size = 7
+        self.value_size = 1
+
+        # These are hyper parameters for the Policy Gradient
+        self.discount_factor = 0.99
+        self.actor_lr = 0.001
+        self.critic_lr = 0.005
+
+        # create model for policy network
+        self.actor = self.build_actor()
+        self.critic = self.build_critic()
+
+    # approximate policy and value using Neural Network
+    # actor: state is input and probability of each action is output of model
+    def build_actor(self):
+        actor = Sequential()
+        actor.add(Dense(24, input_shape=(6, 7, 1), activation='relu',
+                        kernel_initializer='he_uniform'))
+        actor.add(Flatten())  # converts the 3D feature maps to 1D feature vectors
+        actor.add(Dense(self.action_size, activation='softmax',
+                        kernel_initializer='he_uniform'))
+        actor.summary()
+        # See note regarding crossentropy in cartpole_reinforce.py
+        actor.compile(loss='categorical_crossentropy',
+                      optimizer=Adam(lr=self.actor_lr))
+        return actor
+
+    # critic: state is input and value of state is output of model
+    def build_critic(self):
+        critic = Sequential()
+        critic.add(Flatten(input_shape=(6, 7, 1)))
+        critic.add(Dense(24, activation='relu',
+                         kernel_initializer='he_uniform'))
+        #critic.add(Dense(24, input_shape=(6, 7, 1), activation='relu',
+        #                 kernel_initializer='he_uniform'))
+        critic.add(Dense(self.value_size, activation='linear',
+                         kernel_initializer='he_uniform'))
+        critic.summary()
+        critic.compile(loss="mse", optimizer=Adam(lr=self.critic_lr))
+        return critic
+
+    # using the output of policy network, pick action stochastically
+    def get_action(self, state):
+        # state = np.array(state).reshape(-1, *state.shape)
+        # policy = self.actor.predict(state, batch_size=1).flatten()
+        policy = self.actor.predict(state).flatten()
+        choise = np.random.choice(self.action_size, 1, p=policy)
+        return choise[0]
+
+    def get_qs(self, state):
+        policy = self.actor.predict(state).flatten()
+        return policy
+
+    def select_cell(self, state, actionspace, **kwargs):
+        qs = self.get_qs(state)
+        # overrule model probabilties according to the (modified) actionspace
+        for key, prob in enumerate(qs):
+            if key not in actionspace:
+                qs[key] = -99999  # set to low probability
+        action = np.argmax(qs)
+        return action
+
+    # update policy network every episode
+    def train_model(self, state, action, reward, next_state, done):
+        target = np.zeros((1, self.value_size))
+        advantages = np.zeros((1, self.action_size))
+
+        value = self.critic.predict(state)[0]
+        next_value = self.critic.predict(next_state)[0]
+
+        if done:
+            advantages[0][action] = reward - value
+            target[0][0] = reward
+        else:
+            advantages[0][action] = reward + self.discount_factor * (next_value) - value
+            target[0][0] = reward + self.discount_factor * next_value
+
+        self.actor.fit(state, advantages, epochs=1, verbose=0)
+        self.critic.fit(state, target, epochs=1, verbose=0)
+
 
 class DDQNPlayer(Player):
-    """
-    Double deep Q Network agent
-    """
-
     def __init__(self, model, *args):
+        """
+        Double deep Q Network agent
+        """
         super().__init__(*args)
         # Main model: gets trained every step => .fit()
         self.model = model.model  # self.create_model(input_shape=(10,10,3),output_num=9)
@@ -91,6 +184,9 @@ class DDQNPlayer(Player):
 
         # An array with last n steps for training
         self.replay_memory = deque(maxlen=REPLAY_MEMORY_SIZE)
+
+        self.max_q_list = deque(maxlen=REPLAY_MEMORY_SIZE)
+        self.delta_q_list = deque(maxlen=REPLAY_MEMORY_SIZE)
 
     def setup_for_training(self, description=None, dir='logs'):
         """
@@ -190,12 +286,16 @@ class DDQNPlayer(Player):
                 if reward >= 0:
                     new_q = reward + DISCOUNT * max_future_q
                 elif reward < 0:
-                    new_q = reward + DISCOUNT * mean_future_q
+                    new_q = reward + DISCOUNT * max_future_q
+
+                # track average maximum Q value for stats
+                self.max_q_list.append(float(max_future_q))
             else:
                 new_q = reward  # no further max_future_q possible, because done=True
 
             # Update Q value for given state
             current_qs = current_qs_list[index]
+            self.delta_q_list.append(float(current_qs[action] - new_q))  # for logging and stats
             current_qs[action] = new_q  # replace the current_q for the self.model.predict() action by the new_q from the self.target_model.predict() action q-value
 
             # And append to our training data
