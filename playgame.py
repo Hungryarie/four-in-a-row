@@ -22,6 +22,8 @@ import sys
 class Stats():
     def __init__(self):
         self.reset_stats()
+        self.ep_rewards = []  # [-20]
+        self.max_q_list = []
 
     def reset_stats(self):
         self.win_ratio = 0
@@ -34,11 +36,12 @@ class Stats():
         self.count_vertical = 0
         self.count_dia_right = 0
         self.count_dia_left = 0
-        self.ep_rewards = []  # [-20]
-        self.max_q_list = []
 
     def aggregate_stats(self, calc_steps):
-        self.win_ratio = self.win_count / (self.win_count + self.loose_count)
+        try:
+            self.win_ratio = self.win_count / (self.win_count + self.loose_count)
+        except ZeroDivisionError:
+            self.win_ratio = 0.5
         self.turns_count = self.turns_count / calc_steps
         self.count_horizontal = self.count_horizontal / calc_steps
         self.count_vertical = self.count_vertical / calc_steps
@@ -67,14 +70,37 @@ def trainA2C():
 
     env = enviroment(p1, p2)
 
-    scores, episodes = [0,0,0,0,0], [0,0,0,0,0]  # start with 5 zero's otherwise when calculate if the mean for saving goes wrong.
+    # for stats
+    #log = ModelLog(log_filename, log_flag)
+    #log.add_player_info(p1, p2)
+    #log.add_constants()
+    #log.write_to_csv()
+    #log.write_parameters_to_file()
+    count_stats = Stats()  # set new counterclass
+
+    # setup for training
+    #p2modclass = str(log.model2_class)
+    #p2modclass = p2modclass.replace('/', '')
+    #escription = f"(train1 prob-sample selfplay) vs p2={log.player2_class}@{p2modclass}"
+    description = f"(first test A2C)"
+    tensorboard_dir = "logs(debug)"
+    env.player1.setup_for_training(description=description, dir=tensorboard_dir)
+
+    count_stats.ep_rewards, episodes = [0,0,0,0,0], [0,0,0,0,0]  # start with 5 zero's otherwise when calculate if the mean for saving goes wrong.
 
     # Iterate over episodes
     for episode in tqdm(range(1, EPISODES + 1), ascii=True, unit='episodes'):
         done = False
-        score = 0
+        episode_reward = 0
         state = env.reset()
         #state = np.reshape(state, [1, state_size])
+
+        # Update tensorboard step every episode
+        env.player1.tensorboard.step = episode
+
+        # Restarting episode - reset episode reward and step number
+        episode_reward = 0
+        step = 1
 
         while not done:
 
@@ -86,6 +112,8 @@ def trainA2C():
                 action = env.player1.select_cell(state=state3, actionspace=env.action_space)
                 next_state, [_, reward_p1, _], done, info = env.step(action)
                 if done or env._invalid_move_played:
+                    if env._invalid_move_played:
+                        count_stats.invalidmove_count += 1  # tensorboard stats
                     state3 = state[np.newaxis, :, :]
                     next_state3 = next_state[np.newaxis, :, :]
                     env.player1.train_model(state3, action, reward_p1, next_state3, done)
@@ -99,40 +127,82 @@ def trainA2C():
                     state3 = state[np.newaxis, :, :]
                     next_state3 = next_state[np.newaxis, :, :]
                     env.player1.train_model(state3, action, reward_p1, next_state3, done)
+                    step += 1
 
             if not env._invalid_move_played:
-                if env.player1.render:
+                if env.player1.render and episode % 50 == 0:
                     env.render()
                 env.setNextPlayer()
 
-            score += reward_p1
+            episode_reward += reward_p1
             state = next_state
 
-            if done:
-                # every episode, plot the play time
-                score = score if score == 500.0 else score + 100
-                scores.append(score)
-                episodes.append(episode)
-                pylab.plot(episodes, scores, 'b')
+            # for tensorboard stats
+            if env.winner == env.player1.player_id:
+                count_stats.win_count += 1
+            elif env.winner == env.player2.player_id:
+                count_stats.loose_count += 1
+            else:
+                count_stats.draw_count += 1
+            count_stats.turns_count += env.turns
+            if env.winnerhow == "Horizontal":
+                count_stats.count_horizontal += 1
+            if env.winnerhow == "Vertical":
+                count_stats.count_vertical += 1
+            if env.winnerhow == "Diagnal Right":
+                count_stats.count_dia_right += 1
+            if env.winnerhow == "Diagnal Left":
+                count_stats.count_dia_left += 1
+
+        if done:
+            # every episode, plot the play time
+            episode_reward = episode_reward if episode_reward == 500.0 else episode_reward + 100
+            # Append episode reward to a list
+            count_stats.ep_rewards.append(episode_reward)
+            #scores.append(episode_reward)
+            episodes.append(episode)
+            if episode % 50 == 0:
+
+                #  Calculate over stats
+                count_stats.aggregate_stats(calc_steps=AGGREGATE_STATS_EVERY)
+                # update tensorboard
+                env.player1.tensorboard.update_stats(reward_avg=count_stats.average_reward, reward_min=count_stats.min_reward, reward_max=count_stats.max_reward,
+                                                     epsilon=epsilon,
+                                                     win_count=count_stats.win_count, loose_count=count_stats.loose_count, draw_count=count_stats.draw_count,
+                                                     invalidmove_count=count_stats.invalidmove_count, win_ratio=count_stats.win_ratio,
+                                                     turns_count=count_stats.turns_count, count_horizontal=count_stats.count_horizontal,
+                                                     count_vertical=count_stats.count_vertical, count_dia_left=count_stats.count_dia_left,
+                                                     count_dia_right=count_stats.count_dia_right, reward_std=count_stats.std_reward)
+                # reset stats
+                count_stats.reset_stats()
+
+                ep50 = episodes[-min(50, len(episodes)):]
+                score50 = count_stats.ep_rewards[-min(50, len(count_stats.ep_rewards)):]
+                plt.figure(figsize=(30, 20))
+                plt.ylim(-300, 300)
+
+                plt.plot(ep50, score50, 'b')
+                #pylab.plot(episodes, count_stats.ep_rewards, 'b')
                 try:
-                    pylab.savefig(f"output/fourinarow_a2c.png")
+                    pylab.savefig(f"output/fourinarow_a2c ep{episode}.png")
                 except Exception:
                     pass
-                print("episode:", episode, "  score:", score)
+                plt.close()
+            #print("episode:", episode, "  episode_reward:", episode_reward)
 
-                if episode % 100 == 0:
-                    actor_model_name = f'models/A2C/{int(time.time())}_ep{episode}_actor.model'
-                    critic_model_name = f'models/A2C/{int(time.time())}_ep{episode}_critic.model'
-                    env.player1.actor.save(actor_model_name)
-                    env.player1.critic.save(critic_model_name)
-                # if the mean of scores of last 20 episode is bigger than 190
-                # stop training
-                if np.mean(scores[-min(20, len(scores)):]) > 190:
-                    actor_model_name = f'models/A2C/{int(time.time())}_ep{episode}_actor.model'
-                    critic_model_name = f'models/A2C/{int(time.time())}_ep{episode}_critic.model'
-                    env.player1.actor.save(actor_model_name)
-                    env.player1.critic.save(critic_model_name)
-                    sys.exit()
+            if episode % 100 == 0:
+                actor_model_name = f'models/A2C/{int(time.time())}_ep{episode}_actor.model'
+                critic_model_name = f'models/A2C/{int(time.time())}_ep{episode}_critic.model'
+                env.player1.actor.save(actor_model_name)
+                env.player1.critic.save(critic_model_name)
+            # if the mean of ep_rewards of last 20 episode is bigger than 190
+            # stop training
+            if np.mean(count_stats.ep_rewards[-min(20, len(count_stats.ep_rewards)):]) > 190:
+                actor_model_name = f'models/A2C/{int(time.time())}_ep{episode}_actor.model'
+                critic_model_name = f'models/A2C/{int(time.time())}_ep{episode}_critic.model'
+                env.player1.actor.save(actor_model_name)
+                env.player1.critic.save(critic_model_name)
+                sys.exit()
 
 
 def trainNN(p1_model=None, p2_model=None, log_flag=True, visualize_layers=False, debug_flag=False):
@@ -161,7 +231,7 @@ def trainNN(p1_model=None, p2_model=None, log_flag=True, visualize_layers=False,
 
     if p1_model is None:
         # default model to use is:...
-        p1_model = model5(input_shape=(6, 7, 1), output_num=7)  # (7, 6, 1)(1, 42)
+        p1_model = model5(input_shape=(6, 7, 1), output_num=7)
         # p1_model = load_a_model('models\dense2x128(softmax)_startstamp1567090369_episode9050__170.00max__152.60avg___95.00min__1567092303.model')
     p1 = players.DDQNPlayer(p1_model)
     p1.name = "DDQN on training"
@@ -312,8 +382,9 @@ def trainNN(p1_model=None, p2_model=None, log_flag=True, visualize_layers=False,
         if env.winnerhow == "Diagnal Left":
             count_stats.count_dia_left += 1
 
-        # Append episode reward to a list and log stats (every given number of episodes)
+        # Append episode reward to a list
         count_stats.ep_rewards.append(episode_reward)
+        # Log stats (every given number of episodes)
         if not episode % AGGREGATE_STATS_EVERY or episode == 1:
             try:
                 avg_max_q = sum(env.player1.max_q_list[-AGGREGATE_STATS_EVERY:]) / len(env.player1.max_q_list[-AGGREGATE_STATS_EVERY:])
