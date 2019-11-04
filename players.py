@@ -6,7 +6,7 @@ import tensorflow.keras.optimizers as ko
 from tensorflow.keras.utils import plot_model
 #
 from collections import deque
-from model import ModifiedTensorBoard
+from model import ModifiedTensorBoard, empty_model
 import time
 from constants import *
 import game
@@ -23,22 +23,48 @@ class Player:
     def __init__(self):
         self.player_class = self.__class__.__name__
 
-    def shutdown(self):
-        pass
+        self.setup = False
 
-    def add_to_memory(self, add_this):
-        pass
+    # def shutdown(self):
+    #    pass
 
-    def save(self, filename):
-        pass
+    # def add_to_memory(self, add_this):
+    #    pass
+
+    # def save(self, filename):
+    #    pass
 
     @abstractmethod
     def select_cell(self, board, state, actionspace, **kwargs):
         pass
 
-    @abstractmethod
-    def learn(self, **kwargs):
-        pass
+    # @abstractmethod
+    # def learn(self, **kwargs):
+    #    pass
+
+    def setup_for_training(self, description=None, dir='logs'):
+        """
+        Only run this once per trainingsession.
+        Not needed for using the model+agent (it will create an unnecessary tensorboard logfile).
+        -Setup the modified tensorboard.
+        -Set the target update counter to zero.
+
+        """
+        if self.setup is False:
+            if description is not None:
+                description = f" ({description})"
+            else:
+                description = ""
+            # setup custom tensorboard object
+            self.tensorboard = ModifiedTensorBoard(log_dir=f"{dir}/{self.model.model_class}-{self.model.model_name}-{self.model.timestamp}{description}")
+
+            # Used to count when to update target network with main network's weights
+            self.target_update_counter = 0
+
+            # flag for NaN as model outputs
+            self.got_NaNs = False
+
+            self.setup = True
 
 
 class Human(Player):
@@ -77,7 +103,7 @@ class A2CAgent(Player):
 
         super().__init__(*args)
         # if you want to see Cartpole learning, then change to True
-        self.render = False
+        self.render = True
         # get size of state and action
         self.action_size = 7
         self.value_size = 1
@@ -91,6 +117,12 @@ class A2CAgent(Player):
         self.actor = self.build_actor()
         self.critic = self.build_critic()
 
+        # model metadata
+        self.model = empty_model()
+        self.model.model_name = "A2C - dense 1x24"
+        self.model.timestamp = int(time.time())
+        self.model.model_class = self.__class__.__name__
+
     # approximate policy and value using Neural Network
     # actor: state is input and probability of each action is output of model
     def build_actor(self):
@@ -103,7 +135,8 @@ class A2CAgent(Player):
         actor.summary()
         # See note regarding crossentropy in cartpole_reinforce.py
         actor.compile(loss='categorical_crossentropy',
-                      optimizer=Adam(lr=self.actor_lr))
+                      optimizer=Adam(lr=self.actor_lr),
+                      metrics=["accuracy"])
         return actor
 
     # critic: state is input and value of state is output of model
@@ -115,7 +148,9 @@ class A2CAgent(Player):
         critic.add(Dense(self.value_size, activation='linear',
                          kernel_initializer='he_uniform'))
         critic.summary()
-        critic.compile(loss="mse", optimizer=Adam(lr=self.critic_lr))
+        critic.compile(loss="mse",
+                       optimizer=Adam(lr=self.critic_lr),
+                       metrics=["accuracy"])
         return critic
 
     # using the output of policy network, pick action stochastically
@@ -154,8 +189,8 @@ class A2CAgent(Player):
             advantages[0][action] = reward + self.discount_factor * (next_value) - value
             target[0][0] = reward + self.discount_factor * next_value
 
-        self.actor.fit(state, advantages, epochs=1, verbose=0)
-        self.critic.fit(state, target, epochs=1, verbose=0)
+        self.actor.fit(state, advantages, epochs=1, verbose=0, callbacks=[self.tensorboard] if done else None)
+        self.critic.fit(state, target, epochs=1, verbose=0, callbacks=[self.tensorboard] if done else None)
 
 
 class DDQNPlayer(Player):
@@ -194,6 +229,7 @@ class DDQNPlayer(Player):
         -Set the target update counter to zero.
 
         """
+        # ##### also found in the baseclass!!!!
         if self.setup is False:
             if description is not None:
                 description = f" ({description})"
