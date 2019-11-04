@@ -1,6 +1,7 @@
 import numpy as np
 import random
 import matplotlib.pyplot as plt
+import pylab
 import players
 from game import FiarGame
 from env import enviroment
@@ -15,16 +16,127 @@ import tensorflow as tf
 import time
 from datetime import datetime
 import logging
+import sys
 
 
 class Stats():
     def __init__(self):
-        pass
+        self.reset_stats()
+
+    def reset_stats(self):
+        self.win_ratio = 0
+        self.win_count = 0
+        self.loose_count = 0
+        self.draw_count = 0
+        self.invalidmove_count = 0
+        self.turns_count = 0
+        self.count_horizontal = 0
+        self.count_vertical = 0
+        self.count_dia_right = 0
+        self.count_dia_left = 0
+        self.ep_rewards = []  # [-20]
+        self.max_q_list = []
+
+    def aggregate_stats(self, calc_steps):
+        self.win_ratio = self.win_count / (self.win_count + self.loose_count)
+        self.turns_count = self.turns_count / calc_steps
+        self.count_horizontal = self.count_horizontal / calc_steps
+        self.count_vertical = self.count_vertical / calc_steps
+        self.count_dia_left = self.count_dia_left / calc_steps
+        self.count_dia_right = self.count_dia_right / calc_steps
+        self.average_reward = sum(self.ep_rewards[-calc_steps:]) / len(self.ep_rewards[-calc_steps:])
+        self.min_reward = min(self.ep_rewards[-calc_steps:])
+        self.max_reward = max(self.ep_rewards[-calc_steps:])
+        self.std_reward = np.std(self.ep_rewards[-calc_steps:])
+
+
+def trainA2C():
+
+    # For more repetitive results
+    random.seed(1)
+    np.random.seed(1)
+    tf.set_random_seed(1)
+
+    p1 = players.A2CAgent('', '')
+    p1.name = "A2C on training"
+    Model = load_a_model('models/A2C/1572262959_ep63_actor.model')
+    #p2 = players.Drunk()
+    #p2.name = "drunk"
+    p2 = players.DDQNPlayer(Model)
+    p2.name = "dqn"
+
+    env = enviroment(p1, p2)
+
+    scores, episodes = [0,0,0,0,0], [0,0,0,0,0]  # start with 5 zero's otherwise when calculate if the mean for saving goes wrong.
+
+    # Iterate over episodes
+    for episode in tqdm(range(1, EPISODES + 1), ascii=True, unit='episodes'):
+        done = False
+        score = 0
+        state = env.reset()
+        #state = np.reshape(state, [1, state_size])
+
+        while not done:
+
+            env.block_invalid_moves(x=10)
+
+            if env.current_player == 1:
+                state3 = state[np.newaxis, :, :]
+                #action = env.player1.get_action(state3)
+                action = env.player1.select_cell(state=state3, actionspace=env.action_space)
+                next_state, [_, reward_p1, _], done, info = env.step(action)
+                if done or env._invalid_move_played:
+                    state3 = state[np.newaxis, :, :]
+                    next_state3 = next_state[np.newaxis, :, :]
+                    env.player1.train_model(state3, action, reward_p1, next_state3, done)
+            else:
+                #state3 = state[np.newaxis, :, :]
+
+                action_opponent = env.get_selfplay_action()
+
+                next_state, [_, reward_p1, _], done, info = env.step(action_opponent)
+                if not env._invalid_move_played:
+                    state3 = state[np.newaxis, :, :]
+                    next_state3 = next_state[np.newaxis, :, :]
+                    env.player1.train_model(state3, action, reward_p1, next_state3, done)
+
+            if not env._invalid_move_played:
+                if env.player1.render:
+                    env.render()
+                env.setNextPlayer()
+
+            score += reward_p1
+            state = next_state
+
+            if done:
+                # every episode, plot the play time
+                score = score if score == 500.0 else score + 100
+                scores.append(score)
+                episodes.append(episode)
+                pylab.plot(episodes, scores, 'b')
+                try:
+                    pylab.savefig(f"output/fourinarow_a2c.png")
+                except Exception:
+                    pass
+                print("episode:", episode, "  score:", score)
+
+                if episode % 100 == 0:
+                    actor_model_name = f'models/A2C/{int(time.time())}_ep{episode}_actor.model'
+                    critic_model_name = f'models/A2C/{int(time.time())}_ep{episode}_critic.model'
+                    env.player1.actor.save(actor_model_name)
+                    env.player1.critic.save(critic_model_name)
+                # if the mean of scores of last 20 episode is bigger than 190
+                # stop training
+                if np.mean(scores[-min(20, len(scores)):]) > 190:
+                    actor_model_name = f'models/A2C/{int(time.time())}_ep{episode}_actor.model'
+                    critic_model_name = f'models/A2C/{int(time.time())}_ep{episode}_critic.model'
+                    env.player1.actor.save(actor_model_name)
+                    env.player1.critic.save(critic_model_name)
+                    sys.exit()
 
 
 def trainNN(p1_model=None, p2_model=None, log_flag=True, visualize_layers=False, debug_flag=False):
     # For stats
-    ep_rewards = [-20]
     epsilon = 1
     tau = 0
 
@@ -71,26 +183,18 @@ def trainNN(p1_model=None, p2_model=None, log_flag=True, visualize_layers=False,
         analyse_model.update_model(env.player1.model)
         analyse_model.reset_figs()
 
-    #for stats
+    # for stats
     log = ModelLog(log_filename, log_flag)
     log.add_player_info(p1, p2)
     log.add_constants()
     log.write_to_csv()
     log.write_parameters_to_file()
-    win_count = 0
-    loose_count = 0
-    draw_count = 0
-    invalidmove_count = 0
-    turns_count = 0
-    count_horizontal = 0
-    count_vertical = 0
-    count_dia_right = 0
-    count_dia_left = 0
+    count_stats = Stats()  # set new counterclass
 
     # setup for training
     p2modclass = str(log.model2_class)
     p2modclass = p2modclass.replace('/', '')
-    description = f"(train1 prob-sample win100 he_normal update5 selfplay) vs p2={log.player2_class}@{p2modclass}"
+    description = f"(train1 prob-sample selfplay) vs p2={log.player2_class}@{p2modclass}"
     env.player1.setup_for_training(description=description, dir=tensorboard_dir)
 
     log.log_text_to_file(f"Training description: {description}\n")
@@ -146,7 +250,7 @@ def trainNN(p1_model=None, p2_model=None, log_flag=True, visualize_layers=False,
                     env.player1.train(done, step)
 
                 if env._invalid_move_played:
-                    invalidmove_count += 1  # tensorboard stats
+                    count_stats.invalidmove_count += 1  # tensorboard stats
                     # train only when invalid move played
                     env.player1.update_replay_memory((current_state, action_p1, reward_p1, new_state, done))
                     env.player1.train(done, step)
@@ -191,58 +295,55 @@ def trainNN(p1_model=None, p2_model=None, log_flag=True, visualize_layers=False,
                 print(env.player1.analyse_replay_memory())
             analyse_model.reset_figs()
 
-        # tensorboard stats
+        # for tensorboard stats
         if env.winner == env.player1.player_id:
-            win_count += 1
+            count_stats.win_count += 1
         elif env.winner == env.player2.player_id:
-            loose_count += 1
+            count_stats.loose_count += 1
         else:
-            draw_count += 1
-        turns_count += env.turns
+            count_stats.draw_count += 1
+        count_stats.turns_count += env.turns
         if env.winnerhow == "Horizontal":
-            count_horizontal += 1
+            count_stats.count_horizontal += 1
         if env.winnerhow == "Vertical":
-            count_vertical += 1
+            count_stats.count_vertical += 1
         if env.winnerhow == "Diagnal Right":
-            count_dia_right += 1
+            count_stats.count_dia_right += 1
         if env.winnerhow == "Diagnal Left":
-            count_dia_left += 1
+            count_stats.count_dia_left += 1
 
         # Append episode reward to a list and log stats (every given number of episodes)
-        ep_rewards.append(episode_reward)
+        count_stats.ep_rewards.append(episode_reward)
         if not episode % AGGREGATE_STATS_EVERY or episode == 1:
-            win_ratio = win_count / (win_count + loose_count)
-            turns_count = turns_count / AGGREGATE_STATS_EVERY
-            count_horizontal = count_horizontal / AGGREGATE_STATS_EVERY
-            count_vertical = count_vertical / AGGREGATE_STATS_EVERY
-            count_dia_left = count_dia_left / AGGREGATE_STATS_EVERY
-            count_dia_right = count_dia_right / AGGREGATE_STATS_EVERY
-            average_reward = sum(ep_rewards[-AGGREGATE_STATS_EVERY:]) / len(ep_rewards[-AGGREGATE_STATS_EVERY:])
-            min_reward = min(ep_rewards[-AGGREGATE_STATS_EVERY:])
-            max_reward = max(ep_rewards[-AGGREGATE_STATS_EVERY:])
-            std_reward = np.std(ep_rewards[-AGGREGATE_STATS_EVERY:])
-            env.player1.tensorboard.update_stats(reward_avg=average_reward, reward_min=min_reward, reward_max=max_reward, epsilon=epsilon, tau=tau,
-                                                 win_count=win_count, loose_count=loose_count, draw_count=draw_count, invalidmove_count=invalidmove_count,
-                                                 win_ratio=win_ratio, turns_count=turns_count, count_horizontal=count_horizontal,
-                                                 count_vertical=count_vertical, count_dia_left=count_dia_left, count_dia_right=count_dia_right,
-                                                 reward_std=std_reward)
+            try:
+                avg_max_q = sum(env.player1.max_q_list[-AGGREGATE_STATS_EVERY:]) / len(env.player1.max_q_list[-AGGREGATE_STATS_EVERY:])
+            except ZeroDivisionError:
+                avg_max_q = 0
 
+            try:
+                delta_q = sum(env.player1.delta_q_list[-AGGREGATE_STATS_EVERY:]) / len(env.player1.delta_q_list[-AGGREGATE_STATS_EVERY:])
+            except ZeroDivisionError:
+                delta_q = 0
+
+            #  Calculate over stats
+            count_stats.aggregate_stats(calc_steps=AGGREGATE_STATS_EVERY)
+            # update tensorboard
+            env.player1.tensorboard.update_stats(reward_avg=count_stats.average_reward, reward_min=count_stats.min_reward, reward_max=count_stats.max_reward,
+                                                 epsilon=epsilon, tau=tau, avg_max_q=avg_max_q, deta_q=delta_q,
+                                                 win_count=count_stats.win_count, loose_count=count_stats.loose_count, draw_count=count_stats.draw_count,
+                                                 invalidmove_count=count_stats.invalidmove_count, win_ratio=count_stats.win_ratio,
+                                                 turns_count=count_stats.turns_count, count_horizontal=count_stats.count_horizontal,
+                                                 count_vertical=count_stats.count_vertical, count_dia_left=count_stats.count_dia_left,
+                                                 count_dia_right=count_stats.count_dia_right, reward_std=count_stats.std_reward)
             # reset stats
-            win_count = 0
-            loose_count = 0
-            draw_count = 0
-            invalidmove_count = 0
-            count_horizontal = 0
-            count_vertical = 0
-            count_dia_left = 0
-            count_dia_right = 0
+            count_stats.reset_stats()
 
             if visualize_layers:
                 analyse_model.visual_debug_train(state=current_state, turns=env.turns, print_num=False, save_to_file=True, prefix=f'episode {episode}')
 
             # Save model, but only when avg reward is greater or equal a set value
-            if average_reward >= MIN_REWARD:
-                model_temp_name = f'models/{log.model1_class}_{log.model1_name}_startstamp{log.model1_timestamp}_episode{episode}_{max_reward:_>7.2f}max_{average_reward:_>7.2f}avg_{min_reward:_>7.2f}min_{int(time.time())}.model'
+            if count_stats.average_reward >= MIN_REWARD:
+                model_temp_name = f'models/{log.model1_class}_{log.model1_name}_startstamp{log.model1_timestamp}_episode{episode}_{count_stats.max_reward:_>7.2f}max_{count_stats.average_reward:_>7.2f}avg_{count_stats.min_reward:_>7.2f}min_{int(time.time())}.model'
                 env.player1.model.save(model_temp_name)
                 log.log_text_to_file(f"model saved at: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
                 log.log_text_to_file(f' {model_temp_name}\n')
@@ -253,83 +354,11 @@ def trainNN(p1_model=None, p2_model=None, log_flag=True, visualize_layers=False,
             epsilon = max(MIN_EPSILON, epsilon)
 
     # finally save model after training.
-    model_temp_name = f'models/{log.model1_class}_{log.model1_name}_startstamp{log.model1_timestamp}_endtraining_{max_reward:_>7.2f}max_{average_reward:_>7.2f}avg_{min_reward:_>7.2f}min_{int(time.time())}.model'
+    model_temp_name = f'models/{log.model1_class}_{log.model1_name}_startstamp{log.model1_timestamp}_endtraining_{count_stats.max_reward:_>7.2f}max_{count_stats.average_reward:_>7.2f}avg_{count_stats.min_reward:_>7.2f}min_{int(time.time())}.model'
     env.player1.model.save(model_temp_name)
     log.log_text_to_file(f"model saved at: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
     log.log_text_to_file(f' {model_temp_name}')
     log.log_text_to_file(f"end training at: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n")
-
-
-def PlayInEnv():
-    print("play in enviroment\n")
-    # Model = load_a_model('models/func_model_duel1b1_dueling_3xconv+2xdenseSMALL4x4_catCros_SGD+extra dense Functmethod1_startstamp1568924178_endtraining__170.00max__115.00avg_-280.00min_1568928710.model')
-
-    # against drunk
-    Model = load_a_model('models/func_model1_3xconv+2xdenseSMALL4x4(func)(logcosh^Adam^lr=0.01^linear)_startstamp1571331917_episode9650___65.00max__-56.90avg_-370.00min_1571343226.model')
-    # against model above
-    # Model = load_a_model('models/func_model1_3xconv+2xdenseSMALL4x4(func)(mse^Adam^lr=0.001)_startstamp1569850212_episode9800__170.00max__165.40avg__150.00min_1569854021.model')
-
-    p1 = players.DDQNPlayer(Model)
-    p2 = players.Human()
-    # p2 = players.DDQNPlayer(Model2)
-
-    p1.name = "DDQN"
-    p2.name = "arnoud"
-    env = enviroment(p1, p2)
-    env.env_info()
-
-    [rew, rew_p1, rew_p2], _ = env.test(render=True, visualize_layers=True)
-    print(f"reward: {rew}")
-    print(f"reward_p1: {rew_p1}")
-    print(f"reward_p2: {rew_p2}")
-    print(env.Winnerinfo())
-
-
-def TestInEnv():
-
-    SHOW_EVERY = 50
-
-    # Model = load_a_model('models\PreLoadedModel_model4_dense2x128(softmax)_startstamp1563365714_endtraining_startstamp1563370404_episode7050____7.00max____5.23avg__-14.00min__1563372123.model')
-    # Model = load_a_model('models\dense2x128(softmax)_startstamp1567090369_episode9050__170.00max__152.60avg___95.00min__1567092303.model')
-    # Model = load_a_model('models\model4catcross_dense2x128(softmax+CatCrossEntr)_startstamp1568050818_episode9600__165.00max__136.40avg__-50.00min_1568052142.model')
-    Model = load_a_model('models/model1d_3xconv+2xdenseSMALL4x4_startstamp1568634107_episode7900__170.00max___87.30avg_-310.00min_1568639921.model')
-    # Model2 = load_a_model('models\model4a_dense2x128(softmax)(flattenLAST,input_shape bug gone lr=0.001)_startstamp1568020820_episode8350__170.00max__141.60avg__-45.00min_1568027932.model')
-    Model2 = load_a_model('models/model1d_3xconv+2xdenseSMALL4x4_startstamp1568634107_episode7900__170.00max___87.30avg_-310.00min_1568639921.model')
-    p1 = players.DDQNPlayer(Model)
-    # p1 = players.Drunk()
-    # p2 = players.Drunk()
-    p2 = players.DDQNPlayer(Model2)
-
-    p1.name = "trained against model"
-    p2.name = "trained againt random"
-    env = enviroment(p1, p2)
-    env.env_info()
-
-    print("evaluate Training...")
-    rewards_history = []
-    rewards_history_p1 = []
-    rewards_history_p2 = []
-    for i_episode in range(201):
-        observation, *_ = env.reset()
-        # print (observation)
-        [rew, rew_p1, rew_p2], winner = env.test(render=False)
-
-        rewards_history.append(rew)
-        rewards_history_p1.append(rew_p1)
-        rewards_history_p2.append(rew_p2)
-        # print(f"Episode {i_episode} finished with rewardpoints: {rew}")
-
-        if i_episode % SHOW_EVERY == 0:
-            print(f"{SHOW_EVERY} ep mean: {np.mean(rewards_history[-SHOW_EVERY:])}")
-
-    print(f"{i_episode} ep mean (total): {np.mean(rewards_history[:])}")
-    print(f"{i_episode} ep mean (total p1): {np.mean(rewards_history_p1[:])}")
-    print(f"{i_episode} ep mean (total p2): {np.mean(rewards_history_p2[:])}")
-    plt.style.use('seaborn')
-    plt.plot(0, len(rewards_history), rewards_history)
-    plt.xlabel('Episode')
-    plt.ylabel('Total Reward')
-    plt.show()
 
 
 def batch_train():
@@ -343,6 +372,25 @@ def batch_train():
     """
     #model_list.append(func_model5_duel1(input_shape=(6, 7, 1), output_num=7,
     #                  par_loss='mse', par_opt=Adam(lr=0.001), par_metrics='accuracy', par_final_act='linear'))
+
+    #model_list.append(func_model_duel1b1(input_shape=(6, 7, 1), output_num=7,
+    #                  par_loss='logcosh', par_opt=Adam(lr=0.001), par_metrics='accuracy', par_final_act='linear'))
+    model_list.append(func_model_duel1b1(input_shape=(6, 7, 1), output_num=7,
+                      par_loss='logcosh', par_opt=Adam(lr=0.01), par_metrics='accuracy', par_final_act='linear'))
+    model_list.append(func_model_duel1b1(input_shape=(6, 7, 1), output_num=7,
+                      par_loss='logcosh', par_opt=SGD(lr=0.001, momentum=0.9), par_metrics='accuracy', par_final_act='linear'))
+    model_list.append(func_model_duel1b1(input_shape=(6, 7, 1), output_num=7,
+                      par_loss='logcosh', par_opt=SGD(lr=0.01, momentum=0.9), par_metrics='accuracy', par_final_act='linear'))
+
+    model_list.append(func_model_duel1b2(input_shape=(6, 7, 1), output_num=7,
+                      par_loss='logcosh', par_opt=Adam(lr=0.001), par_metrics='accuracy', par_final_act='linear'))
+    model_list.append(func_model_duel1b2(input_shape=(6, 7, 1), output_num=7,
+                      par_loss='logcosh', par_opt=Adam(lr=0.01), par_metrics='accuracy', par_final_act='linear'))
+    model_list.append(func_model_duel1b2(input_shape=(6, 7, 1), output_num=7,
+                      par_loss='logcosh', par_opt=SGD(lr=0.001, momentum=0.9), par_metrics='accuracy', par_final_act='linear'))
+    model_list.append(func_model_duel1b2(input_shape=(6, 7, 1), output_num=7,
+                      par_loss='logcosh', par_opt=SGD(lr=0.01, momentum=0.9), par_metrics='accuracy', par_final_act='linear'))
+
     model_list.append(func_model1(input_shape=(6, 7, 1), output_num=7,
                       par_loss='logcosh', par_opt=Adam(lr=0.001), par_metrics='accuracy', par_final_act='linear'))
     model_list.append(func_model1(input_shape=(6, 7, 1), output_num=7,
@@ -351,6 +399,7 @@ def batch_train():
                       par_loss='logcosh', par_opt=SGD(lr=0.001, momentum=0.9), par_metrics='accuracy', par_final_act='linear'))
     model_list.append(func_model1(input_shape=(6, 7, 1), output_num=7,
                       par_loss='logcosh', par_opt=SGD(lr=0.01, momentum=0.9), par_metrics='accuracy', par_final_act='linear'))
+
     #model_list.append(func_model1(input_shape=(6, 7, 1), output_num=7,
     #                  par_loss='categorical_crossentropy', par_opt=Adam(lr=0.001), clipnorm=1.0, clipvalue=0.5, par_metrics='accuracy', par_final_act='linear'))
     #model_list.append(func_model1(input_shape=(6, 7, 1), output_num=7,
@@ -367,15 +416,12 @@ def batch_train():
 
     #clipnorm=1.0, clipvalue=0.5
 
-    
     #model2 = load_a_model('models/func_model1_3xconv+2xdenseSMALL4x4(func)(mse^Adam^lr=0.001)_startstamp1569842535_episode7450__170.00max___66.60avg_-205.00min_1569845018.model')
     model2 = None
     for model in model_list:
-        trainNN(p1_model=model, p2_model=model2, visualize_layers=False, debug_flag=False)
+        trainNN(p1_model=model, p2_model=model2, visualize_layers=False, debug_flag=True)
 
 
 if __name__ == '__main__':
-
-    #TestInEnv()
-    PlayInEnv()
     #batch_train()
+    trainA2C()
