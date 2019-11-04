@@ -7,7 +7,7 @@ class FiarGame:
     REWARD_LOSING = -100  #-100  #-10
     REWARD_TIE = -99  #-99  # -5
     REWARD_INVALID_MOVE = -10   #-50  # -10  # -0.5
-    REWARD_STEP = -5  #-5  # -0.5
+    REWARD_STEP = -1  #-5  # -0.5
 
     def __init__(self, player1, player2):
 
@@ -15,11 +15,11 @@ class FiarGame:
         self.columns = 7
 
         self.player1 = player1
-        self.player1.color = "Y"
+        self.player1.color = "1"
         self.player1.player_id = 1
 
         self.player2 = player2
-        self.player2.color = "R"
+        self.player2.color = "2"
         self.player2.player_id = -1
 
         self.reset()
@@ -27,6 +27,7 @@ class FiarGame:
     def reset(self):
         self.playingField = np.zeros([self.rows, self.columns], dtype=int)
         self.playingField = self.playingField[:, :, np.newaxis]
+        self.featuremap = np.zeros([self.rows, self.columns, 4], dtype=int)
         self.winner = 0                       # winner id. 0 is no winner yet
         self.winnerhow = "none"
         self.done = False
@@ -35,6 +36,59 @@ class FiarGame:
         self._invalid_move_played = False
         self._invalid_move_count = 0
         self._invalid_move_action = False
+
+        self.featuremap_dict = {}
+        self.enrich_feature_space()
+
+    def enrich_feature_space(self):
+        self._feature_space_field()
+        self._feature_space_free_space()
+        self._feature_space_active_player()
+        self._feature_space_next_move()
+
+    def _feature_space_field(self):
+        # layer 0 = the playingfield
+        self.featuremap_dict['0'] = "the playingfield"
+        self.featuremap[:, :, 0] = self.playingField[:, :, 0]
+
+    def _feature_space_active_player(self):
+        # layer 1 = active player
+        self.featuremap_dict['1'] = "active player"
+        active_arr = np.full((self.rows, self.columns), self.current_player)
+        self.featuremap[:, :, 1] = active_arr
+
+    def _feature_space_free_space(self):
+        # layer 2 = free space
+        self.featuremap_dict['2'] = "free space"
+        for row in reversed(self.featuremap):
+            for col in row:
+                if col[0] == 0:
+                    col[2] = 1
+                else:
+                    col[2] = 0
+
+    def _feature_space_next_move(self):
+        # layer 3 = next move space
+        self.featuremap_dict['3'] = "next move space"
+        col_full = np.full((7), False)
+        for row in reversed(self.featuremap):
+            for idx, col in enumerate(row):
+                if col[0] == 0 and not col_full[idx]:
+                    col[3] = 1
+                    col_full[idx] = True
+                else:
+                    col[3] = 0
+
+    def print_feature_space(self):
+        print("layer 0 = the playingfield:")
+        print(self.featuremap[:, :, 0])
+        print("\nlayer 1 = active player:")
+        print(self.featuremap[:, :, 1])
+        print("\nlayer 2 = free space")
+        print(self.featuremap[:, :, 2])
+        print("\nlayer 3 = next move space")
+        print(self.featuremap[:, :, 3])
+        print("\n")
 
     @property
     def active_player(self):
@@ -54,6 +108,11 @@ class FiarGame:
         # Set the next turn
         # self.current_player = abs(self.current_player - 2) + 1
         self.current_player = self.current_player * -1
+
+        # enricht the featurespace with the current player
+        # self.enrich_feature_space()  # is already done at env.step()
+        self._feature_space_active_player()
+        # self.print_feature_space()
 
     def getPlayerById(self, id):
         if self.player1.player_id == id:
@@ -204,8 +263,10 @@ class FiarGame:
             inColumn = int(inColumn)
         except:
             print(f"'{inColumn}' is no integer, try again")
+            self._invalid_move_played = True
             return False
         if inColumn >= self.columns or inColumn < 0:
+            self._invalid_move_played = True
             print(f"'{inColumn}' is out of bounds, try again")
             return False
 
@@ -218,7 +279,6 @@ class FiarGame:
                 elif self.playingField[self.rows - i, inColumn] == 0:
                     self.playingField[self.rows - i, inColumn] = ActivePlayer
                     self._invalid_move_played = False
-                    #self.setNextPlayer() # Set the next turn
                     self.turns += 1  # iterate the number of turns
                     self._invalid_move_count = 0  # reset invalid move counter to zero
                     return True
