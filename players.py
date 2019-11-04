@@ -95,7 +95,7 @@ class A2CAgent(Player):
     # actor: state is input and probability of each action is output of model
     def build_actor(self):
         actor = Sequential()
-        actor.add(Dense(24, input_shape=(6, 7, 1), activation='relu',
+        actor.add(Dense(24, input_shape=(6, 7, 4), activation='relu',
                         kernel_initializer='he_uniform'))
         actor.add(Flatten())  # converts the 3D feature maps to 1D feature vectors
         actor.add(Dense(self.action_size, activation='softmax',
@@ -109,11 +109,9 @@ class A2CAgent(Player):
     # critic: state is input and value of state is output of model
     def build_critic(self):
         critic = Sequential()
-        critic.add(Flatten(input_shape=(6, 7, 1)))
+        critic.add(Flatten(input_shape=(6, 7, 4)))
         critic.add(Dense(24, activation='relu',
                          kernel_initializer='he_uniform'))
-        #critic.add(Dense(24, input_shape=(6, 7, 1), activation='relu',
-        #                 kernel_initializer='he_uniform'))
         critic.add(Dense(self.value_size, activation='linear',
                          kernel_initializer='he_uniform'))
         critic.summary()
