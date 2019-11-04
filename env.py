@@ -30,8 +30,8 @@ class enviroment(FiarGame):
         super().reset()
         self.action_space = self.GetActionSpace()
 
-        # return self.GetState() #, 0, False, None
-        return self.playingField
+        # return self.playingField
+        return self.featuremap
 
     def render(self):
         """
@@ -49,6 +49,22 @@ class enviroment(FiarGame):
         """
         # return random.randint(0, self.action_space_n - 1)
         return np.random.choice(self.action_space)
+
+    def get_selfplay_action(self):
+        """get the selfplay action by reversing the playingfield and using the policy from the agent who is training"""
+        # print("###start###")
+        # self.print_feature_space()
+        self.featuremap[:, :, 0] = self.active_player.inverse_state(self.featuremap[:, :, 0])  # inverse field
+        # self.enrich_feature_space()
+        # print("------")
+        self.featuremap[:, :, 1] = self.active_player.inverse_state(self.featuremap[:, :, 1])  # inverse players turn aswell.
+        # self.print_feature_space()
+        # print("###end###")
+        state = self.featuremap[np.newaxis, :, :]
+        selfplay_action = self.inactive_player.select_cell(state=state, actionspace=self.action_space)
+        self.featuremap[:, :, 0] = self.active_player.inverse_state(self.featuremap[:, :, 0])  # reverse field back to original game status
+
+        return selfplay_action
 
     def reward(self, reward_clipping=False):
         # reward = 0
@@ -103,8 +119,10 @@ class enviroment(FiarGame):
         self.addCoin(action, self.active_player.player_id)
         self.CheckGameEnd()
 
-        # return self.GetState(), self.reward(), self.done, self.info()
-        return self.playingField, self.reward(reward_clipping=False), self.done, self.info()
+        self.enrich_feature_space()
+
+        # return self.playingField, self.reward(reward_clipping=False), self.done, self.info()
+        return self.featuremap, self.reward(reward_clipping=False), self.done, self.info()
 
     def block_invalid_moves(self, x=10):
         """
