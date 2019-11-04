@@ -540,12 +540,17 @@ class AnalyseModel:
 ######################################################################################
 
 
+class empty_model:
+    def __init__(self):
+        pass
+
+
 class load_a_model:
     def __init__(self, path):
         try:
             self.model = load_model(path)
             self.target_model = load_model(path)
-        except:
+        except Exception:
             raise NameError(f"could not open ({path}). Doesn't exist?")
 
         path = path[7:]  # removes subdir (models/)
@@ -589,7 +594,7 @@ class model_base:
         self.model._lr = K.eval(self.model.optimizer.lr)
         self.model._lr = format(self.model._lr, '.00000g')
         self.model.optimizer_name = self.model.optimizer.__class__.__name__
-        self.model.fin_activation = self.fin_activation
+        self.model.fin_activation = self.fin_activation # final activation
         # print(self.model.optimizer.get_config())
 
         # temporary fix.. see issue #6
