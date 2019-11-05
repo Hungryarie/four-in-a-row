@@ -10,6 +10,7 @@ from model import ModifiedTensorBoard, empty_model
 import time
 from constants import *
 import game
+import warnings
 
 
 class Player:
@@ -41,6 +42,11 @@ class Player:
     # @abstractmethod
     # def learn(self, **kwargs):
     #    pass
+
+    def inverse_state(self, state):
+        """swap the player_id in the playingfield/state"""
+        inverse = np.array(state) * -1
+        return inverse
 
     def setup_for_training(self, description=None, dir='logs'):
         """
@@ -75,8 +81,8 @@ class Human(Player):
         cell = input("Select column to fill: ")
         return cell
 
-    def learn(self, **kwargs):
-        pass
+    #def learn(self, **kwargs):
+    #    pass
 
 
 class Drunk(Player):
@@ -88,8 +94,23 @@ class Drunk(Player):
         # return random.randint(min(actionspace), max(actionspace))
         return np.random.choice(actionspace)
 
-    def learn(self, **kwargs):
-        pass
+    #def learn(self, **kwargs):
+    #    pass
+
+
+class Selfplay(Player):
+    def __init__(self, player, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.player = player
+
+    def select_cell(self, state, actionspace, **kwargs):
+        state[:, :, 0] = self.inverse_state(state[:, :, 0])  # inverse field
+        state[:, :, 1] = self.inverse_state(state[:, :, 1])  # inverse players turn aswell.
+        action = self.player.select_cell(state, actionspace, **kwargs)
+        state[:, :, 0] = self.inverse_state(state[:, :, 0])  # reverse field back to original game status
+        state[:, :, 1] = self.inverse_state(state[:, :, 1])  # reverse players turn aswell.
+
+        return action
 
 from keras import Sequential
 from keras.layers import Dense, Flatten
@@ -100,7 +121,6 @@ class A2CAgent(Player):
         A2C(Advantage Actor-Critic) agent\n
         https://github.com/rlcode/reinforcement-learning/blob/master/2-cartpole/4-actor-critic/cartpole_a2c.py
         """
-
         super().__init__(*args)
         # if you want to see Cartpole learning, then change to True
         self.render = True
@@ -166,6 +186,8 @@ class A2CAgent(Player):
         return policy
 
     def select_cell(self, state, actionspace, **kwargs):
+        state = state[np.newaxis, :, :]  # add one dimention in order to work (6,7,4) => (1,6,7,4)
+
         qs = self.get_qs(state)
         # overrule model probabilties according to the (modified) actionspace
         for key, prob in enumerate(qs):
@@ -176,6 +198,10 @@ class A2CAgent(Player):
 
     # update policy network every episode
     def train_model(self, state, action, reward, next_state, done):
+        # add one dimention in order to work (6,7,4) => (1,6,7,4)
+        state = state[np.newaxis, :, :]
+        next_state = next_state[np.newaxis, :, :]
+
         target = np.zeros((1, self.value_size))
         advantages = np.zeros((1, self.action_size))
 
@@ -223,13 +249,14 @@ class DDQNPlayer(Player):
 
     def setup_for_training(self, description=None, dir='logs'):
         """
+        @@@@@@@@@@ also found in the baseclass!!!!
         Only run this once per trainingsession.
         Not needed for using the model+agent (it will create an unnecessary tensorboard logfile).
         -Setup the modified tensorboard.
         -Set the target update counter to zero.
-
         """
-        # ##### also found in the baseclass!!!!
+        warnings.warn("deprecated. Is being replaced by parent class", DeprecationWarning)
+
         if self.setup is False:
             if description is not None:
                 description = f" ({description})"
@@ -446,7 +473,11 @@ class DDQNPlayer(Player):
         return action
 
     def inverse_state(self, state):
-        """swap the player_id in the playingfield/state"""
+        """
+        @@@@@@@@@@ also found in the baseclass!!!!
+        swap the player_id in the playingfield/state"""
+        warnings.warn("deprecated. Is being replaced by parent class", DeprecationWarning)
+
         inverse = np.array(state) * -1
         return inverse
 
