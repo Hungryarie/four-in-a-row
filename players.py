@@ -244,8 +244,8 @@ class DDQNPlayer(Player):
         # An array with last n steps for training
         self.replay_memory = deque(maxlen=REPLAY_MEMORY_SIZE)
 
-        self.max_q_list = deque(maxlen=REPLAY_MEMORY_SIZE)
-        self.delta_q_list = deque(maxlen=REPLAY_MEMORY_SIZE)
+        self.max_q_list = deque(maxlen=AGGREGATE_STATS_EVERY)
+        self.delta_q_list = deque(maxlen=AGGREGATE_STATS_EVERY)
 
     def setup_for_training(self, description=None, dir='logs'):
         """
