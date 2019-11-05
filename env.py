@@ -12,7 +12,10 @@ import logging
 
 
 class enviroment(FiarGame):
-    def __init__(self, *args):
+    def __init__(self, *args, enriched_features=False):
+
+        self.enriched_features = enriched_features
+
         # FiarGame.__init__(self, *args)
         super().__init__(*args)
         # self.observation_space = self.GetObservationSpace()
@@ -30,8 +33,10 @@ class enviroment(FiarGame):
         super().reset()
         self.action_space = self.GetActionSpace()
 
-        # return self.playingField
-        return self.featuremap
+        if self.enriched_features:
+            return self.featuremap
+        else:
+            return self.playingField
 
     def render(self):
         """
@@ -52,6 +57,8 @@ class enviroment(FiarGame):
 
     def get_selfplay_action(self):
         """get the selfplay action by reversing the playingfield and using the policy from the agent who is training"""
+        warnings.warn("deprecated. Is being replaced by player.SelfPlay class", DeprecationWarning)
+
         # print("###start###")
         # self.print_feature_space()
         self.featuremap[:, :, 0] = self.active_player.inverse_state(self.featuremap[:, :, 0])  # inverse field
@@ -60,9 +67,10 @@ class enviroment(FiarGame):
         self.featuremap[:, :, 1] = self.active_player.inverse_state(self.featuremap[:, :, 1])  # inverse players turn aswell.
         # self.print_feature_space()
         # print("###end###")
-        state = self.featuremap[np.newaxis, :, :]
-        selfplay_action = self.inactive_player.select_cell(state=state, actionspace=self.action_space)
+        # state = self.featuremap[np.newaxis, :, :]
+        selfplay_action = self.inactive_player.select_cell(state=self.featuremap, actionspace=self.action_space)
         self.featuremap[:, :, 0] = self.active_player.inverse_state(self.featuremap[:, :, 0])  # reverse field back to original game status
+        self.featuremap[:, :, 1] = self.active_player.inverse_state(self.featuremap[:, :, 1])  # reverse players turn aswell.
 
         return selfplay_action
 
@@ -119,10 +127,15 @@ class enviroment(FiarGame):
         self.addCoin(action, self.active_player.player_id)
         self.CheckGameEnd()
 
-        self.enrich_feature_space()
+        if self.enriched_features:
+            self.enrich_feature_space()
+            state = self.featuremap
+        else:
+            state = self.playingField
 
         # return self.playingField, self.reward(reward_clipping=False), self.done, self.info()
-        return self.featuremap, self.reward(reward_clipping=False), self.done, self.info()
+        # return self.featuremap, self.reward(reward_clipping=False), self.done, self.info()
+        return state, self.reward(reward_clipping=False), self.done, self.info()
 
     def block_invalid_moves(self, x=10):
         """
