@@ -65,8 +65,9 @@ def trainA2C():
     Model = load_a_model('models/A2C/1572262959_ep63_actor.model')
     #p2 = players.Drunk()
     #p2.name = "drunk"
-    p2 = players.DDQNPlayer(Model)
-    p2.name = "dqn"
+    #p2 = players.DDQNPlayer(Model)
+    p2 = players.Selfplay(p1)
+    p2.name = "selfplay"
 
     env = enviroment(p1, p2)
 
@@ -93,7 +94,6 @@ def trainA2C():
         done = False
         episode_reward = 0
         state = env.reset()
-        #state = np.reshape(state, [1, state_size])
 
         # Update tensorboard step every episode
         env.player1.tensorboard.step = episode
@@ -107,26 +107,19 @@ def trainA2C():
             env.block_invalid_moves(x=10)
 
             if env.current_player == 1:
-                state3 = state[np.newaxis, :, :]
-                #action = env.player1.get_action(state3)
-                action = env.player1.select_cell(state=state3, actionspace=env.action_space)
+                action = env.player1.select_cell(state=state, actionspace=env.action_space)
                 next_state, [_, reward_p1, _], done, info = env.step(action)
                 if done or env._invalid_move_played:
                     if env._invalid_move_played:
                         count_stats.invalidmove_count += 1  # tensorboard stats
-                    state3 = state[np.newaxis, :, :]
-                    next_state3 = next_state[np.newaxis, :, :]
-                    env.player1.train_model(state3, action, reward_p1, next_state3, done)
+                    env.player1.train_model(state, action, reward_p1, next_state, done)
             else:
-                #state3 = state[np.newaxis, :, :]
-
-                action_opponent = env.get_selfplay_action()
+                # action_opponent = env.get_selfplay_action()
+                action_opponent = env.active_player.select_cell(state=state, actionspace=env.action_space)
 
                 next_state, [_, reward_p1, _], done, info = env.step(action_opponent)
                 if not env._invalid_move_played:
-                    state3 = state[np.newaxis, :, :]
-                    next_state3 = next_state[np.newaxis, :, :]
-                    env.player1.train_model(state3, action, reward_p1, next_state3, done)
+                    env.player1.train_model(state, action, reward_p1, next_state, done)
                     step += 1
 
             if not env._invalid_move_played:
@@ -154,55 +147,55 @@ def trainA2C():
             if env.winnerhow == "Diagnal Left":
                 count_stats.count_dia_left += 1
 
-        if done:
-            # every episode, plot the play time
-            episode_reward = episode_reward if episode_reward == 500.0 else episode_reward + 100
-            # Append episode reward to a list
-            count_stats.ep_rewards.append(episode_reward)
-            #scores.append(episode_reward)
-            episodes.append(episode)
-            if episode % 50 == 0:
+        # if done:
+        # every episode, plot the play time
+        # episode_reward = episode_reward if episode_reward == 500.0 else episode_reward + 100
+        # Append episode reward to a list
+        count_stats.ep_rewards.append(episode_reward)
+        # scores.append(episode_reward)
+        episodes.append(episode)
+        if episode % 50 == 0:
 
-                #  Calculate over stats
-                count_stats.aggregate_stats(calc_steps=AGGREGATE_STATS_EVERY)
-                # update tensorboard
-                env.player1.tensorboard.update_stats(reward_avg=count_stats.average_reward, reward_min=count_stats.min_reward, reward_max=count_stats.max_reward,
-                                                     epsilon=epsilon,
-                                                     win_count=count_stats.win_count, loose_count=count_stats.loose_count, draw_count=count_stats.draw_count,
-                                                     invalidmove_count=count_stats.invalidmove_count, win_ratio=count_stats.win_ratio,
-                                                     turns_count=count_stats.turns_count, count_horizontal=count_stats.count_horizontal,
-                                                     count_vertical=count_stats.count_vertical, count_dia_left=count_stats.count_dia_left,
-                                                     count_dia_right=count_stats.count_dia_right, reward_std=count_stats.std_reward)
-                # reset stats
-                count_stats.reset_stats()
+            #  Calculate over stats
+            count_stats.aggregate_stats(calc_steps=AGGREGATE_STATS_EVERY)
+            # update tensorboard
+            env.player1.tensorboard.update_stats(reward_avg=count_stats.average_reward, reward_min=count_stats.min_reward, reward_max=count_stats.max_reward,
+                                                 epsilon=epsilon,
+                                                 win_count=count_stats.win_count, loose_count=count_stats.loose_count, draw_count=count_stats.draw_count,
+                                                 invalidmove_count=count_stats.invalidmove_count, win_ratio=count_stats.win_ratio,
+                                                 turns_count=count_stats.turns_count, count_horizontal=count_stats.count_horizontal,
+                                                 count_vertical=count_stats.count_vertical, count_dia_left=count_stats.count_dia_left,
+                                                 count_dia_right=count_stats.count_dia_right, reward_std=count_stats.std_reward)
+            # reset stats
+            count_stats.reset_stats()
 
-                ep50 = episodes[-min(50, len(episodes)):]
-                score50 = count_stats.ep_rewards[-min(50, len(count_stats.ep_rewards)):]
-                plt.figure(figsize=(30, 20))
-                plt.ylim(-300, 300)
+            ep50 = episodes[-min(50, len(episodes)):]
+            score50 = count_stats.ep_rewards[-min(50, len(count_stats.ep_rewards)):]
+            plt.figure(figsize=(30, 20))
+            plt.ylim(-300, 300)
 
-                plt.plot(ep50, score50, 'b')
-                #pylab.plot(episodes, count_stats.ep_rewards, 'b')
-                try:
-                    pylab.savefig(f"output/fourinarow_a2c ep{episode}.png")
-                except Exception:
-                    pass
-                plt.close()
-            #print("episode:", episode, "  episode_reward:", episode_reward)
+            plt.plot(ep50, score50, 'b')
+            # pylab.plot(episodes, count_stats.ep_rewards, 'b')
+            try:
+                pylab.savefig(f"output/fourinarow_a2c ep{episode}.png")
+            except Exception:
+                pass
+            plt.close()
+        # print("episode:", episode, "  episode_reward:", episode_reward)
 
-            if episode % 100 == 0:
-                actor_model_name = f'models/A2C/{int(time.time())}_ep{episode}_actor.model'
-                critic_model_name = f'models/A2C/{int(time.time())}_ep{episode}_critic.model'
-                env.player1.actor.save(actor_model_name)
-                env.player1.critic.save(critic_model_name)
-            # if the mean of ep_rewards of last 20 episode is bigger than 190
-            # stop training
-            if np.mean(count_stats.ep_rewards[-min(20, len(count_stats.ep_rewards)):]) > 190:
-                actor_model_name = f'models/A2C/{int(time.time())}_ep{episode}_actor.model'
-                critic_model_name = f'models/A2C/{int(time.time())}_ep{episode}_critic.model'
-                env.player1.actor.save(actor_model_name)
-                env.player1.critic.save(critic_model_name)
-                sys.exit()
+        if episode % 100 == 0:
+            actor_model_name = f'models/A2C/{int(time.time())}_ep{episode}_actor.model'
+            critic_model_name = f'models/A2C/{int(time.time())}_ep{episode}_critic.model'
+            env.player1.actor.save(actor_model_name)
+            env.player1.critic.save(critic_model_name)
+        # if the mean of ep_rewards of last 20 episode is bigger than 190
+        # stop training
+        if np.mean(count_stats.ep_rewards[-min(20, len(count_stats.ep_rewards)):]) > 190:
+            actor_model_name = f'models/A2C/{int(time.time())}_ep{episode}_actor.model'
+            critic_model_name = f'models/A2C/{int(time.time())}_ep{episode}_critic.model'
+            env.player1.actor.save(actor_model_name)
+            env.player1.critic.save(critic_model_name)
+            sys.exit()
 
 
 def trainNN(p1_model=None, p2_model=None, log_flag=True, visualize_layers=False, debug_flag=False):
@@ -330,7 +323,7 @@ def trainNN(p1_model=None, p2_model=None, log_flag=True, visualize_layers=False,
                 # current_state = new_state
                 # step += 1
             else:
-                #action_opponent = env.active_player.select_cell(board=env.playingField, state=env.GetState(), actionspace=env.action_space)
+                # action_opponent = env.active_player.select_cell(board=env.playingField, state=env.GetState(), actionspace=env.action_space)
                 # selfplay
                 env.playingField = env.inactive_player.inverse_state(env.playingField)
                 action_opponent = env.active_player.select_cell(board=env.playingField, state=env.GetState(), actionspace=env.action_space)
@@ -446,6 +439,7 @@ def batch_train():
 
     #model_list.append(func_model_duel1b1(input_shape=(6, 7, 1), output_num=7,
     #                  par_loss='logcosh', par_opt=Adam(lr=0.001), par_metrics='accuracy', par_final_act='linear'))
+    """
     model_list.append(func_model_duel1b1(input_shape=(6, 7, 1), output_num=7,
                       par_loss='logcosh', par_opt=Adam(lr=0.01), par_metrics='accuracy', par_final_act='linear'))
     model_list.append(func_model_duel1b1(input_shape=(6, 7, 1), output_num=7,
@@ -468,6 +462,7 @@ def batch_train():
                       par_loss='logcosh', par_opt=Adam(lr=0.01), par_metrics='accuracy', par_final_act='linear'))
     model_list.append(func_model1(input_shape=(6, 7, 1), output_num=7,
                       par_loss='logcosh', par_opt=SGD(lr=0.001, momentum=0.9), par_metrics='accuracy', par_final_act='linear'))
+    """
     model_list.append(func_model1(input_shape=(6, 7, 1), output_num=7,
                       par_loss='logcosh', par_opt=SGD(lr=0.01, momentum=0.9), par_metrics='accuracy', par_final_act='linear'))
 
