@@ -1,14 +1,14 @@
 # Constants
 DISCOUNT = 0.99
-REPLAY_MEMORY_SIZE = 10_000 #25_000  # 50_000  # How many last steps to keep for model training
+REPLAY_MEMORY_SIZE = 10_000  # 25_000  # 50_000  # How many last steps to keep for model training
 MIN_REPLAY_MEMORY_SIZE = 1_000  # Minimum number of steps in a memory to start training
 MINIBATCH_SIZE = 64  # How many steps (samples) to use for training
 UPDATE_TARGET_EVERY = 5  # Terminal states (end of episodes)
-MIN_REWARD = -60 # 120 # For model save
+MIN_REWARD = -60  # 120 # For model save
 MEMORY_FRACTION = 0.20  # not so relevant yet (only gpu)
 
 # Environment settings
-EPISODES = 13_000
+EPISODES = 20_000
 
 # Exploration settings
 epsilon = 1  # not a constant, going to be decayed
@@ -22,5 +22,5 @@ SHOW_PREVIEW = False
 
 class TrainingParameters():
     def __init__(self):
-        #2do
+        # 2do
         pass
