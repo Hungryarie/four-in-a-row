@@ -69,7 +69,7 @@ def trainA2C():
     p2 = players.Selfplay(p1)
     p2.name = "selfplay"
 
-    env = enviroment(p1, p2)
+    env = enviroment(p1, p2, enriched_features=True)
 
     # for stats
     #log = ModelLog(log_filename, log_flag)
@@ -380,12 +380,14 @@ def trainNN(p1_model=None, p2_model=None, log_flag=True, visualize_layers=False,
         # Log stats (every given number of episodes)
         if not episode % AGGREGATE_STATS_EVERY or episode == 1:
             try:
-                avg_max_q = sum(env.player1.max_q_list[-AGGREGATE_STATS_EVERY:]) / len(env.player1.max_q_list[-AGGREGATE_STATS_EVERY:])
+                suma = sum(env.player1.max_q_list)
+                lena = len(env.player1.max_q_list)
+                avg_max_q = sum(env.player1.max_q_list) / len(env.player1.max_q_list)
             except ZeroDivisionError:
                 avg_max_q = 0
 
             try:
-                delta_q = sum(env.player1.delta_q_list[-AGGREGATE_STATS_EVERY:]) / len(env.player1.delta_q_list[-AGGREGATE_STATS_EVERY:])
+                delta_q = sum(env.player1.delta_q_list) / len(env.player1.delta_q_list)
             except ZeroDivisionError:
                 delta_q = 0
 
@@ -489,5 +491,5 @@ def batch_train():
 
 
 if __name__ == '__main__':
-    #batch_train()
-    trainA2C()
+    batch_train()
+    #trainA2C()
