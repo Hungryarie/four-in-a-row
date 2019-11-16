@@ -4,53 +4,43 @@ import matplotlib.pyplot as plt
 import pylab
 import players
 from game import FiarGame
-from env import enviroment
+from env import environment
 from model import ModelLog, load_a_model, model1, model1b, model1c, model1d, model2, model3, model4a, model4b, model5
 from model import func_model1, func_model_duel1b, func_model_duel1b1, func_model_duel1b2, func_model5, func_model5_duel1  # functional API specific
 from model import AnalyseModel
 from keras.optimizers import Adam, SGD, RMSprop
 from tqdm import tqdm
-from constants import *
+from constants import TrainingParameters
 import os
 import tensorflow as tf
 import time
 from datetime import datetime
 import logging
 import sys
+from logandstats import Stats
+from train import TrainAgent
+from constants import TrainingParameters
 
 
-class Stats():
-    def __init__(self):
-        self.reset_stats()
-        self.ep_rewards = []  # [-20]
-        self.max_q_list = []
+def train_in_class():
+    p1 = players.A2CAgent('', '', enriched_features=True)
+    p1.name = "A2C on training"
+    p2 = players.Selfplay(p1)
+    p2.name = "selfplay"
+    #p2 = players.Drunk()
+    #p2.name = "drunk"
 
-    def reset_stats(self):
-        self.win_ratio = 0
-        self.win_count = 0
-        self.loose_count = 0
-        self.draw_count = 0
-        self.invalidmove_count = 0
-        self.turns_count = 0
-        self.count_horizontal = 0
-        self.count_vertical = 0
-        self.count_dia_right = 0
-        self.count_dia_left = 0
+    param = TrainingParameters()
 
-    def aggregate_stats(self, calc_steps):
-        try:
-            self.win_ratio = self.win_count / (self.win_count + self.loose_count)
-        except ZeroDivisionError:
-            self.win_ratio = 0.5
-        self.turns_count = self.turns_count / calc_steps
-        self.count_horizontal = self.count_horizontal / calc_steps
-        self.count_vertical = self.count_vertical / calc_steps
-        self.count_dia_left = self.count_dia_left / calc_steps
-        self.count_dia_right = self.count_dia_right / calc_steps
-        self.average_reward = sum(self.ep_rewards[-calc_steps:]) / len(self.ep_rewards[-calc_steps:])
-        self.min_reward = min(self.ep_rewards[-calc_steps:])
-        self.max_reward = max(self.ep_rewards[-calc_steps:])
-        self.std_reward = np.std(self.ep_rewards[-calc_steps:])
+    env = environment(p1, p2, reward_dict=param.reward_dict)
+
+    training = TrainAgent(env, parameters=param, debug_flag=True)
+
+    description = "first test. x=200. CORRECT tau on p1 and p2 "
+    description += f"enr.feature={p1.enriched_features}"
+    training.setup_training(train_description=description)
+    training.run_training()
+    training.save_model(player=p1)  # save model after training
 
 
 def trainA2C():
@@ -60,16 +50,16 @@ def trainA2C():
     np.random.seed(1)
     tf.set_random_seed(1)
 
-    p1 = players.A2CAgent('', '')
+    p1 = players.A2CAgent('', '', enriched_features=False)
     p1.name = "A2C on training"
-    Model = load_a_model('models/A2C/1572262959_ep63_actor.model')
+    #Model = load_a_model('models/A2C/1572262959_ep63_actor.model')
     #p2 = players.Drunk()
     #p2.name = "drunk"
     #p2 = players.DDQNPlayer(Model)
     p2 = players.Selfplay(p1)
     p2.name = "selfplay"
 
-    env = enviroment(p1, p2, enriched_features=True)
+    env = environment(p1, p2)
 
     # for stats
     #log = ModelLog(log_filename, log_flag)
@@ -87,7 +77,7 @@ def trainA2C():
     tensorboard_dir = "logs(debug)"
     env.player1.setup_for_training(description=description, dir=tensorboard_dir)
 
-    count_stats.ep_rewards, episodes = [0,0,0,0,0], [0,0,0,0,0]  # start with 5 zero's otherwise when calculate if the mean for saving goes wrong.
+    count_stats.ep_rewards, count_stats.episodes = [0,0,0,0,0], [0,0,0,0,0]  # start with 5 zero's otherwise when calculate if the mean for saving goes wrong.
 
     # Iterate over episodes
     for episode in tqdm(range(1, EPISODES + 1), ascii=True, unit='episodes'):
@@ -153,7 +143,7 @@ def trainA2C():
         # Append episode reward to a list
         count_stats.ep_rewards.append(episode_reward)
         # scores.append(episode_reward)
-        episodes.append(episode)
+        count_stats.episodes.append(episode)
         if episode % 50 == 0:
 
             #  Calculate over stats
@@ -169,13 +159,13 @@ def trainA2C():
             # reset stats
             count_stats.reset_stats()
 
-            ep50 = episodes[-min(50, len(episodes)):]
+            ep50 = count_stats.episodes[-min(50, len(count_stats.episodes)):]
             score50 = count_stats.ep_rewards[-min(50, len(count_stats.ep_rewards)):]
             plt.figure(figsize=(30, 20))
             plt.ylim(-300, 300)
 
             plt.plot(ep50, score50, 'b')
-            # pylab.plot(episodes, count_stats.ep_rewards, 'b')
+            # pylab.plot(count_stats.episodes, count_stats.ep_rewards, 'b')
             try:
                 pylab.savefig(f"output/fourinarow_a2c ep{episode}.png")
             except Exception:
@@ -226,7 +216,7 @@ def trainNN(p1_model=None, p2_model=None, log_flag=True, visualize_layers=False,
         # default model to use is:...
         p1_model = model5(input_shape=(6, 7, 1), output_num=7)
         # p1_model = load_a_model('models\dense2x128(softmax)_startstamp1567090369_episode9050__170.00max__152.60avg___95.00min__1567092303.model')
-    p1 = players.DDQNPlayer(p1_model)
+    p1 = players.DDQNPlayer(p1_model, enriched_features=False)
     p1.name = "DDQN on training"
 
     if p2_model is None:
@@ -239,7 +229,7 @@ def trainNN(p1_model=None, p2_model=None, log_flag=True, visualize_layers=False,
         p2 = players.DDQNPlayer(p2_model)
         p2.name = "p2 on pretrained model"
 
-    env = enviroment(p1, p2)
+    env = environment(p1, p2)
 
     if visualize_layers:
         analyse_model = AnalyseModel()  # make analyse model of each layer
@@ -491,5 +481,6 @@ def batch_train():
 
 
 if __name__ == '__main__':
-    batch_train()
+    #batch_train()
     #trainA2C()
+    train_in_class()
