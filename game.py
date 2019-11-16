@@ -3,11 +3,11 @@ import random
 
 
 class FiarGame:
-    REWARD_WINNING = 100  # 200  # 20
-    REWARD_LOSING = -100  #-100  #-10
-    REWARD_TIE = -99  #-99  # -5
-    REWARD_INVALID_MOVE = -10   #-50  # -10  # -0.5
-    REWARD_STEP = -1  #-5  # -0.5
+    # REWARD_WINNING = 100  # 200  # 20
+    # REWARD_LOSING = -100  #-100  #-10
+    # REWARD_TIE = -99  #-99  # -5
+    # REWARD_INVALID_MOVE = -10   #-50  # -10  # -0.5
+    # REWARD_STEP = -1  #-5  # -0.5
 
     def __init__(self, player1, player2):
 
@@ -17,10 +17,12 @@ class FiarGame:
         self.player1 = player1
         self.player1.color = "1"
         self.player1.player_id = 1
+        self.player1.value = 1
 
         self.player2 = player2
         self.player2.color = "2"
-        self.player2.player_id = -1
+        self.player2.player_id = 2
+        self.player2.value = -1
 
         self.reset()
 
@@ -33,9 +35,12 @@ class FiarGame:
         self.done = False
         self.turns = 0                       # amount of tries before winning
         self.current_player = random.choice([self.player1.player_id, self.player2.player_id])  # random pick a player to start
+        self.current_player_value = self.getPlayerById(self.current_player).value
         self._invalid_move_played = False
         self._invalid_move_count = 0
         self._invalid_move_action = False
+        self.prev_invalid_move_count = 0        # for collecting the max in a row invalidmove count
+        self.prev_invalid_move_reset = True
 
         self.featuremap_dict = {}
         self.enrich_feature_space()
@@ -47,14 +52,14 @@ class FiarGame:
         self._feature_space_next_move()
 
     def _feature_space_field(self):
-        # layer 0 = the playingfield
-        self.featuremap_dict['0'] = "the playingfield"
+        # layer 0 = the playingField
+        self.featuremap_dict['0'] = "the playingField"
         self.featuremap[:, :, 0] = self.playingField[:, :, 0]
 
     def _feature_space_active_player(self):
         # layer 1 = active player
         self.featuremap_dict['1'] = "active player"
-        active_arr = np.full((self.rows, self.columns), self.current_player)
+        active_arr = np.full((self.rows, self.columns), self.current_player_value)
         self.featuremap[:, :, 1] = active_arr
 
     def _feature_space_free_space(self):
@@ -80,7 +85,7 @@ class FiarGame:
                     col[3] = 0
 
     def print_feature_space(self):
-        print("layer 0 = the playingfield:")
+        print("layer 0 = the playingField:")
         print(self.featuremap[:, :, 0])
         print("\nlayer 1 = active player:")
         print(self.featuremap[:, :, 1])
@@ -106,8 +111,9 @@ class FiarGame:
 
     def setNextPlayer(self):
         # Set the next turn
-        # self.current_player = abs(self.current_player - 2) + 1
-        self.current_player = self.current_player * -1
+        self.current_player = abs(self.current_player - 2) + 1
+        # self.current_player = self.current_player * -1
+        self.current_player_value = self.getPlayerById(self.current_player).value
 
         # enricht the featurespace with the current player
         # self.enrich_feature_space()  # is already done at env.step()
@@ -129,6 +135,7 @@ class FiarGame:
         return self.columns
 
     def GetState(self):
+        """flattend array of the state"""
         flatStateArray = self.playingField.flatten()
         return flatStateArray
 
@@ -185,7 +192,7 @@ class FiarGame:
 
     def checkForWinnerDiaRight(self):
         # print("Check for a Diagnal Right Winner")
-        array = self.NProtate45(self.playingField)  # skew the playingfield 45degrees
+        array = self.NProtate45(self.playingField)  # skew the playingField 45degrees
         winner = sum(np.apply_along_axis(self.checkFourOnARow, axis=0, arr=array))  # axis=0: vertical
         if winner != 0:
             self.winnerhow = "Diagnal Right"
@@ -193,7 +200,7 @@ class FiarGame:
 
     def checkForWinnerDiaLeft(self):
         # print("Check for a Diagnal Left Winner")
-        array = self.NProtate275(self.playingField)  # skew the playingfield minus 45degrees
+        array = self.NProtate275(self.playingField)  # skew the playingField minus 45degrees
         winner = sum(np.apply_along_axis(self.checkFourOnARow, axis=0, arr=array))  # axis=0: vertical
         if winner != 0:
             self.winnerhow = "Diagnal Left"
@@ -235,7 +242,7 @@ class FiarGame:
 
     @staticmethod
     def checkFourOnARow(x):
-        #print ("x:", x)
+        # print ("x:", x)
         count = 0
         same = 0
         win = False
@@ -256,12 +263,12 @@ class FiarGame:
         # print (f"x: {x} >> countsame: {count+1} >> win: {win} >> winner: {winner}")
         return winner  # sum(x)
 
-    def addCoin(self, inColumn, ActivePlayer):
-        # print (f"adding {ActivePlayer} coin in column {inColumn}")
+    def addCoin(self, inColumn, coin_value):
+        # print (f"adding {coin_value} coin in column {inColumn}")
 
         try:
             inColumn = int(inColumn)
-        except:
+        except Exception:
             print(f"'{inColumn}' is no integer, try again")
             self._invalid_move_played = True
             return False
@@ -277,36 +284,42 @@ class FiarGame:
                 if i > int(self.rows):
                     raise Exception("no checking further neccecary")
                 elif self.playingField[self.rows - i, inColumn] == 0:
-                    self.playingField[self.rows - i, inColumn] = ActivePlayer
+                    self.playingField[self.rows - i, inColumn] = coin_value
                     self._invalid_move_played = False
                     self.turns += 1  # iterate the number of turns
+                    self.prev_invalid_move_count = self._invalid_move_count  # log previous invalid move count
+                    self.prev_invalid_move_reset = True  # set flag to being read
                     self._invalid_move_count = 0  # reset invalid move counter to zero
                     return True
                 else:
                     # print (f"row {self.rows-i} is already filled with {self.playingField[self.rows-i, inColumn]}")
                     i += 1
-            except:
+            except Exception:
                 # print(f"column {inColumn} is already totally filled")
                 self._invalid_move_played = True
                 self._invalid_move_count += 1
                 self._invalid_move_action = inColumn
+                self.prev_invalid_move_reset = False
                 return False
 
     def ShowField(self):
         print(" |0|1|2|3|4|5|6| << colums")
         print(self.playingField)
 
-    def ShowField2(self):
+    def ShowField2(self, field=None):
+        if field is None:
+            field = self.playingField
+
         print("|0|1|2|3|4|5|6| << colums")
-        for i in self.playingField:
+        for i in field:
             row = ""
             for j in i:
-                if j == 0:
-                    j = " "
-                elif j == self.player1.player_id:
-                    j = self.player1.color
-                elif j == self.player2.player_id:
-                    j = self.player2.color
-                row += "|" + str(j)
+                if j[0] == 0:
+                    coin_collor = " "
+                elif j[0] == self.player1.value:
+                    coin_collor = self.player1.color
+                elif j[0] == self.player2.value:
+                    coin_collor = self.player2.color
+                row += "|" + str(coin_collor)
             row += "|"
             print(row)
