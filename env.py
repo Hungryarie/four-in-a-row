@@ -11,19 +11,18 @@ from model import AnalyseModel
 import logging
 
 
-class enviroment(FiarGame):
-    def __init__(self, *args, enriched_features=False):
+class environment(FiarGame):
+    def __init__(self, *args, reward_dict):
 
-        self.enriched_features = enriched_features
-
-        # FiarGame.__init__(self, *args)
         super().__init__(*args)
-        # self.observation_space = self.GetObservationSpace()
+
         self.observation_space_n = self.GetObservationSize()
-        self.observation_max = self.player1.player_id  # equals 1
-        self.observation_min = self.player2.player_id  # equals -1
+        self.observation_max = self.player1.value  # equals 1
+        self.observation_min = self.player2.value  # equals -1
         self.action_space = self.GetActionSpace()
         self.action_space_n = self.GetActionSize()
+
+        self.reward_dict = reward_dict
 
     def reset(self):
         """
@@ -33,7 +32,8 @@ class enviroment(FiarGame):
         super().reset()
         self.action_space = self.GetActionSpace()
 
-        if self.enriched_features:
+        if self.active_player.enriched_features:
+        # if self.enriched_features:
             return self.featuremap
         else:
             return self.playingField
@@ -78,32 +78,32 @@ class enviroment(FiarGame):
         # reward = 0
         # reward_p1 = 0
         # reward_p2 = 0
-        reward = self.REWARD_STEP
+        reward = self.reward_dict['step']                   # REWARD_STEP
         if self.active_player.player_id == self.player1.player_id:
-            reward_p1 = self.REWARD_STEP
-            reward_p2 = self.REWARD_STEP  # 0
+            reward_p1 = self.reward_dict['step']            # REWARD_STEP
+            reward_p2 = self.reward_dict['step']            # REWARD_STEP  # 0
         if self.active_player.player_id == self.player2.player_id:
-            reward_p2 = self.REWARD_STEP
-            reward_p1 = self.REWARD_STEP  # 0
+            reward_p2 = self.reward_dict['step']            # REWARD_STEP
+            reward_p1 = self.reward_dict['step']            # REWARD_STEP  # 0
 
         if self.winner == 0 and self.done is True:
-            reward = self.REWARD_TIE
-            reward_p1 = self.REWARD_TIE
-            reward_p2 = self.REWARD_TIE
-        if self.winner == self.player1.player_id:
-            reward = self.REWARD_WINNING
-            reward_p1 = self.REWARD_WINNING
-            reward_p2 = self.REWARD_LOSING
-        if self.winner == self.player2.player_id:
-            reward = self.REWARD_LOSING
-            reward_p1 = self.REWARD_LOSING
-            reward_p2 = self.REWARD_WINNING
+            reward = self.reward_dict['tie']                # self.REWARD_TIE
+            reward_p1 = self.reward_dict['tie']             # self.REWARD_TIE
+            reward_p2 = self.reward_dict['tie']             # self.REWARD_TIE
+        if self.winner == self.player1.value:           # player_id:
+            reward = self.reward_dict['win']                # self.REWARD_WINNING
+            reward_p1 = self.reward_dict['win']             # self.REWARD_WINNING
+            reward_p2 = self.reward_dict['lose']            # self.REWARD_LOSING
+        if self.winner == self.player2.value:           # player_id:
+            reward = self.reward_dict['lose']               # self.REWARD_LOSING
+            reward_p1 = self.reward_dict['lose']            # self.REWARD_LOSING
+            reward_p2 = self.reward_dict['win']             # self.REWARD_WINNING
         if self._invalid_move_played:
-            reward = self.REWARD_INVALID_MOVE
+            reward = self.reward_dict['invalid']            # self.REWARD_INVALID_MOVE
             if self.active_player.player_id == self.player1.player_id:
-                reward_p1 = self.REWARD_INVALID_MOVE
+                reward_p1 = self.reward_dict['invalid']     # self.REWARD_INVALID_MOVE
             if self.active_player.player_id == self.player2.player_id:
-                reward_p2 = self.REWARD_INVALID_MOVE
+                reward_p2 = self.reward_dict['invalid']     # self.REWARD_INVALID_MOVE
 
         if reward_clipping:
             reward = self.reward_clipping(reward)
@@ -124,11 +124,12 @@ class enviroment(FiarGame):
         returns
         observation, reward, done, info
         """
-        self.addCoin(action, self.active_player.player_id)
+        self.addCoin(action, coin_value=self.active_player.value)
         self.CheckGameEnd()
 
-        if self.enriched_features:
-            self.enrich_feature_space()
+        self.enrich_feature_space()  # enrich always (needed for training)
+        if self.active_player.enriched_features:
+        # if self.enriched_features:
             state = self.featuremap
         else:
             state = self.playingField
@@ -144,9 +145,9 @@ class enviroment(FiarGame):
         if isinstance(self._invalid_move_action, int) and self._invalid_move_count > x and self._invalid_move_played is True:
             try:
                 self.action_space.remove(self._invalid_move_action)
-                logging.info(f"block action:{self._invalid_move_action} from trying")
+                logging.info(f"block action:{self._invalid_move_action} from trying (by player: {self.active_player})")
             except Exception:
-                logging.error(f'trying to remove item ({self._invalid_move_action}) from list ({self.action_space}) that does not excist.')
+                logging.error(f'trying to remove item ({self._invalid_move_action}) from list ({self.action_space}) that does not excist. (by player: {self.active_player})')
 
     def info(self):
         dicti = {"active_player": self.active_player.name,
@@ -179,7 +180,13 @@ class enviroment(FiarGame):
                 print(f"> Turn: {self.active_player.name} ({self.active_player.color})")
                 print(f' > Actionspace: {self.action_space}')
 
-            action = self.active_player.select_cell(board=self.playingField, state=self.GetState(), actionspace=self.action_space)
+            if self.active_player.enriched_features:
+            # if self.enriched_features:
+                state = self.featuremap
+            else:
+                state = self.playingField
+
+            action = self.active_player.select_cell(board=state, state=self.GetState(), actionspace=self.action_space)
             observation, reward, done, info = self.step(action)
 
             if not self._invalid_move_played:
