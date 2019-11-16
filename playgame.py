@@ -5,9 +5,9 @@ import pylab
 import players
 from game import FiarGame
 from env import environment
-from model import ModelLog, load_a_model, model1, model1b, model1c, model1d, model2, model3, model4a, model4b, model5
+from model import load_a_model, model1, model1b, model1c, model1d, model2, model3, model4a, model4b, model5
 from model import func_model1, func_model_duel1b, func_model_duel1b1, func_model_duel1b2, func_model5, func_model5_duel1  # functional API specific
-from model import AnalyseModel
+from analyse import AnalyseModel
 from keras.optimizers import Adam, SGD, RMSprop
 from tqdm import tqdm
 from constants import TrainingParameters
@@ -17,7 +17,7 @@ import time
 from datetime import datetime
 import logging
 import sys
-from logandstats import Stats
+from logandstats import Stats, ModelLog
 from train import TrainAgent
 from constants import TrainingParameters
 

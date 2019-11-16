@@ -7,7 +7,7 @@ import random
 import matplotlib.pyplot as plt
 import players
 from game import FiarGame
-from model import AnalyseModel
+from analyse import AnalyseModel
 import logging
 
 

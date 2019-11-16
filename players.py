@@ -6,9 +6,10 @@ import tensorflow.keras.optimizers as ko
 from tensorflow.keras.utils import plot_model
 #
 from collections import deque
-from model import ModifiedTensorBoard, empty_model
+from model import empty_model
+from train import ModifiedTensorBoard
 import time
-from constants import *
+#from constants import *
 import game
 import warnings
 import logging
