@@ -9,7 +9,7 @@ import keras.backend as K
 from keras.optimizers import Adam, SGD, RMSprop
 from keras import initializers
 
-from constants import *
+#from constants import *
 from game import FiarGame
 import time
 from datetime import datetime
@@ -88,8 +88,15 @@ class ModelLog():
         except AttributeError:
             self.model2_used_path = 'n/a'
 
-    def add_constants(self):
-        self.constants = {
+    def add_constants(self, parameters):
+        """parameters = object with attributes of trainingparameters"""
+        members = [attr for attr in dir(parameters) if not callable(getattr(parameters, attr)) and not attr.startswith("__")]
+        # print(members)
+        self.constants = {}
+        for member in members:
+            self.constants[member] = getattr(parameters, member)
+
+        """self.constants = {
             "MIN_REWARD": MIN_REWARD,
             "EPISODES": EPISODES,
             "REWARD_WINNING": FiarGame.REWARD_WINNING,
@@ -108,7 +115,7 @@ class ModelLog():
             "MIN_EPSILON": MIN_EPSILON,
             "AGGREGATE_STATS_EVERY": AGGREGATE_STATS_EVERY,
             "SHOW_PREVIEW": SHOW_PREVIEW
-        }
+        }"""
 
     def write_parameters_to_file(self):
         if self.log_flag is False:
@@ -147,7 +154,13 @@ class ModelLog():
 
         # constantsinfo
         for key, constant in self.constants.items():
-            f.write(f"{key} = {constant}\n")
+            if isinstance(constant, dict):
+                # constant is a dictionary
+                f.write(f"{key}:\n")
+                for k, v in constant.items():
+                    f.write(f" {k} = {v}\n")
+            else:
+                f.write(f"{key} = {constant}\n")
         f.write("\n")
 
         # closing file
