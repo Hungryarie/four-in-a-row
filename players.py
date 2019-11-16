@@ -11,20 +11,23 @@ import time
 from constants import *
 import game
 import warnings
+import logging
 
 
 class Player:
     """
     Base class for all player types
     """
-    name = None
-    player_id = None
-    color = None
+    # name = None
+    # player_id = None
+    # color = None
 
     def __init__(self):
         self.player_class = self.__class__.__name__
 
         self.setup = False
+
+        self.enriched_features = False
 
     # def shutdown(self):
     #    pass
@@ -42,9 +45,12 @@ class Player:
     # @abstractmethod
     # def learn(self, **kwargs):
     #    pass
+    def train_model(self, *args, **kwargs):  # state, action, reward, next_state, done
+        """pass: no train_model method implemented"""
+        pass
 
     def inverse_state(self, state):
-        """swap the player_id in the playingfield/state"""
+        """swap the player_value in the playingfield/state"""
         inverse = np.array(state) * -1
         return inverse
 
@@ -54,7 +60,6 @@ class Player:
         Not needed for using the model+agent (it will create an unnecessary tensorboard logfile).
         -Setup the modified tensorboard.
         -Set the target update counter to zero.
-
         """
         if self.setup is False:
             if description is not None:
@@ -72,6 +77,39 @@ class Player:
 
             self.setup = True
 
+    def get_prob_action(self, state, actionspace, tau=0.5, clip=(-1000, 300.)):
+        """Boltzmann equation"""
+        # tau=0.1
+        assert len(actionspace) >= 1
+        q_values = self.get_qs(state)
+        tau = 0.0000000001 if tau == 0 else tau
+        nb_actions = q_values.shape[0]
+
+        clipped_val = np.clip(q_values, clip[0], clip[1])
+        clipped_val = clipped_val - np.max(clipped_val)  # normalize trick
+        exp = clipped_val / tau
+        exp = np.clip(exp, -500, 500)  # otherwise inf when passing in too big numbers
+        exp_values = np.exp(exp)
+
+        # set probability to zero for all blocked actions
+        no_action = np.arange(nb_actions).astype(int)
+        no_action = np.delete(no_action, actionspace)
+        exp_values[no_action] = 0
+
+        # calculate probability
+        try:
+            probs = exp_values / np.sum(exp_values)
+            # probs2 = np.true_divide(exp_values, np.sum(exp_values))
+            action = np.random.choice(range(nb_actions), p=probs)
+            # print(probs)
+        except RuntimeWarning:
+            action = np.random.choice(actionspace)
+        except ValueError:
+            logging.warning(f"tau:{tau} resulted in INF probabilities")
+            action = np.random.choice(actionspace)
+
+        return action
+
 
 class Human(Player):
     """
@@ -81,21 +119,23 @@ class Human(Player):
         cell = input("Select column to fill: ")
         return cell
 
-    #def learn(self, **kwargs):
-    #    pass
+    def get_prob_action(self, *args, **kwargs):
+        logging.error("Human class has no probability action")
+        return np.random.choice(actionspace)
 
 
 class Drunk(Player):
     """
     Drunk player always selects a random valid move
     """
-    def select_cell(self, board, state, actionspace, **kwargs):
+    def select_cell(self, state, actionspace, **kwargs):
         # return random.randint(0,np.size(board,1)-1)
         # return random.randint(min(actionspace), max(actionspace))
         return np.random.choice(actionspace)
 
-    #def learn(self, **kwargs):
-    #    pass
+    def get_prob_action(self, *args, **kwargs):
+        logging.error("Drunk class has no probability action")
+        return np.random.choice(actionspace)
 
 
 class Selfplay(Player):
@@ -103,20 +143,34 @@ class Selfplay(Player):
         super().__init__(*args, **kwargs)
         self.player = player
 
+        self.enriched_features = self.player.enriched_features
+
     def select_cell(self, state, actionspace, **kwargs):
-        state[:, :, 0] = self.inverse_state(state[:, :, 0])  # inverse field
-        state[:, :, 1] = self.inverse_state(state[:, :, 1])  # inverse players turn aswell.
+        #state[:, :, 0] = self.inverse_state(state[:, :, 0])  # inverse field
+        #if self.player.enriched_features:
+        #    state[:, :, 1] = self.inverse_state(state[:, :, 1])  # inverse players turn aswell.
         action = self.player.select_cell(state, actionspace, **kwargs)
-        state[:, :, 0] = self.inverse_state(state[:, :, 0])  # reverse field back to original game status
-        state[:, :, 1] = self.inverse_state(state[:, :, 1])  # reverse players turn aswell.
+        #state[:, :, 0] = self.inverse_state(state[:, :, 0])  # reverse field back to original game status
+        #if self.player.enriched_features:
+        #    state[:, :, 1] = self.inverse_state(state[:, :, 1])  # reverse players turn aswell.
 
         return action
+
+    def train_model(self, *args, **kwargs):
+        # pass througt to player train_model method
+        self.player.train_model(*args, **kwargs)
+
+    def get_qs(self, *args, **kwargs):
+        # pass througt to player get_gs method
+        policy = self.player.get_qs(*args, **kwargs)
+        return policy
+
 
 from keras import Sequential
 from keras.layers import Dense, Flatten
 from keras.optimizers import Adam
 class A2CAgent(Player):
-    def __init__(self, actor_model, critic_model, *args):
+    def __init__(self, actor_model, critic_model, *args, enriched_features=True):
         """
         A2C(Advantage Actor-Critic) agent\n
         https://github.com/rlcode/reinforcement-learning/blob/master/2-cartpole/4-actor-critic/cartpole_a2c.py
@@ -128,6 +182,13 @@ class A2CAgent(Player):
         self.action_size = 7
         self.value_size = 1
 
+        #
+        self.enriched_features = enriched_features
+        if self.enriched_features:
+            self.channels = 4
+        else:
+            self.channels = 1
+
         # These are hyper parameters for the Policy Gradient
         self.discount_factor = 0.99
         self.actor_lr = 0.001
@@ -137,17 +198,22 @@ class A2CAgent(Player):
         self.actor = self.build_actor()
         self.critic = self.build_critic()
 
-        # model metadata
+        # model metadata (temporary here)
         self.model = empty_model()
         self.model.model_name = "A2C - dense 1x24"
         self.model.timestamp = int(time.time())
         self.model.model_class = self.__class__.__name__
+        self.model.optimizer_name = "Adam"
+        self.model._lr = self.actor_lr
+        self.model.loss = "categorical_crossentropy"
+        self.model.metrics = "accuracy"
+        self.model.fin_activation = "softmax"
 
     # approximate policy and value using Neural Network
     # actor: state is input and probability of each action is output of model
     def build_actor(self):
         actor = Sequential()
-        actor.add(Dense(24, input_shape=(6, 7, 4), activation='relu',
+        actor.add(Dense(24, input_shape=(6, 7, self.channels), activation='relu',
                         kernel_initializer='he_uniform'))
         actor.add(Flatten())  # converts the 3D feature maps to 1D feature vectors
         actor.add(Dense(self.action_size, activation='softmax',
@@ -162,7 +228,7 @@ class A2CAgent(Player):
     # critic: state is input and value of state is output of model
     def build_critic(self):
         critic = Sequential()
-        critic.add(Flatten(input_shape=(6, 7, 4)))
+        critic.add(Flatten(input_shape=(6, 7, self.channels)))
         critic.add(Dense(24, activation='relu',
                          kernel_initializer='he_uniform'))
         critic.add(Dense(self.value_size, activation='linear',
@@ -174,19 +240,28 @@ class A2CAgent(Player):
         return critic
 
     # using the output of policy network, pick action stochastically
-    def get_action(self, state):
+    def get_action(self, state, actionspace, **kwargs):
         # state = np.array(state).reshape(-1, *state.shape)
         # policy = self.actor.predict(state, batch_size=1).flatten()
-        policy = self.actor.predict(state).flatten()
-        choise = np.random.choice(self.action_size, 1, p=policy)
+        policy = self.get_qs(state)
+
+        # set probability to zero for all blocked actions
+        nb_actions = policy.shape[0]
+        no_action = np.arange(nb_actions).astype(int)
+        no_action = np.delete(no_action, actionspace)
+        policy[no_action] = 0
+
+        choise = np.random.choice(actionspace, 1, p=policy)
         return choise[0]
 
     def get_qs(self, state):
+        state = state[np.newaxis, :, :]  # add one dimention in order to work (6,7,4) => (1,6,7,4)
+
         policy = self.actor.predict(state).flatten()
         return policy
 
     def select_cell(self, state, actionspace, **kwargs):
-        state = state[np.newaxis, :, :]  # add one dimention in order to work (6,7,4) => (1,6,7,4)
+        # state = state[np.newaxis, :, :]  # add one dimention in order to work (6,7,4) => (1,6,7,4)
 
         qs = self.get_qs(state)
         # overrule model probabilties according to the (modified) actionspace
@@ -220,7 +295,7 @@ class A2CAgent(Player):
 
 
 class DDQNPlayer(Player):
-    def __init__(self, model, *args):
+    def __init__(self, model, *args, enriched_features=False):
         """
         Double deep Q Network agent
         """
@@ -233,6 +308,8 @@ class DDQNPlayer(Player):
         self.target_model.set_weights(self.model.get_weights())
 
         self.setup = False
+
+        self.enriched_features = enriched_features
 
         # check on which player-id the model was trained
         if self.model.model_class == 'load_a_model':
@@ -305,6 +382,11 @@ class DDQNPlayer(Player):
         counts['step'] = count_REWARD_STEP
 
         return counts
+
+    def train_model(self, state, action, reward, next_state, done):
+
+        self.update_replay_memory((state, action, reward, next_state, done))
+        self.train(done, None)
 
     def train(self, terminal_state, step):
         """
@@ -445,7 +527,11 @@ class DDQNPlayer(Player):
             self.target_update_counter = 0  # reset
 
     def get_prob_action(self, state, actionspace, tau=0.5, clip=(-1000, 300.)):
-        """Boltzmann equation"""
+        """Boltzmann equation
+        @@@@@@@@@@ also found in the baseclass!!!!
+        swap the player_value in the playingfield/state"""
+        warnings.warn("deprecated. Is being replaced by parent class", DeprecationWarning)
+        raise DeprecationWarning
         assert len(actionspace) >= 1
         q_values = self.get_qs(state)
         tau = 0.0000000001 if tau == 0 else tau
@@ -475,8 +561,9 @@ class DDQNPlayer(Player):
     def inverse_state(self, state):
         """
         @@@@@@@@@@ also found in the baseclass!!!!
-        swap the player_id in the playingfield/state"""
+        swap the player_value in the playingfield/state"""
         warnings.warn("deprecated. Is being replaced by parent class", DeprecationWarning)
+        raise DeprecationWarning
 
         inverse = np.array(state) * -1
         return inverse
@@ -489,7 +576,7 @@ class DDQNPlayer(Player):
 
         # inverse state when using a loaded model AND current player-id isn't equal to on which player-id the loaded model was binded to.
         if self.model.model_class == 'load_a_model' and self.player_id != self.model_trained_on_player_id:
-            # call function to swap the player_id's in the state
+            # call function to swap the player_value's in the state
             state = self.inverse_state(state)
 
         qs = self.model.predict(np.array(state).reshape(-1, *state.shape) / 1)[0]
