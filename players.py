@@ -1,18 +1,19 @@
-# borrowed from: https://github.com/shakedzy/tic_tac_toe/blob/master/players.py
+# build up upon: https://github.com/shakedzy/tic_tac_toe/blob/master/players.py
 import random
 import numpy as np
 from abc import abstractmethod
 import tensorflow.keras.optimizers as ko
 from tensorflow.keras.utils import plot_model
-#
 from collections import deque
-from model import empty_model
-from train import ModifiedTensorBoard
 import time
-#from constants import *
+
+# own file imports
+# from constants import *
 import game
 import warnings
 import logging
+from model import empty_model
+from train import ModifiedTensorBoard
 
 
 class Player:
