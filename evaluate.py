@@ -1,8 +1,11 @@
 import numpy as np
 import matplotlib.pyplot as plt
+
+# own file imports
 import players
 from env import environment
 from model import load_a_model
+from constants import TrainingParameters
 
 
 def test_in_env():
@@ -57,18 +60,24 @@ def play_in_env():
     # Model = load_a_model('models/func_model_duel1b1_dueling_3xconv+2xdenseSMALL4x4_catCros_SGD+extra dense Functmethod1_startstamp1568924178_endtraining__170.00max__115.00avg_-280.00min_1568928710.model')
 
     # against drunk
-    Model = load_a_model('models/A2C/1573509293_ep20000_actor.model')
+    #Model = load_a_model('models/A2C/1573509293_ep20000_actor.model')
     # against model above
     # Model = load_a_model('models/func_model1_3xconv+2xdenseSMALL4x4(func)(mse^Adam^lr=0.001)_startstamp1569850212_episode9800__170.00max__165.40avg__150.00min_1569854021.model')
 
-    p1 = players.DDQNPlayer(Model, enriched_features=True)
-    #p1 = players.Human()
+    #p1 = players.DDQNPlayer(Model, enriched_features=True)
+    p1 = players.Human()
     p2 = players.Human()
     # p2 = players.DDQNPlayer(Model2)
 
+    p1.enriched_features = True
+    p2.enriched_features = True
+
     p1.name = "DDQN"
     p2.name = "arnoud"
-    env = environment(p1, p2)
+
+    param = TrainingParameters()  # get reward_dict
+
+    env = environment(p1, p2, reward_dict=param.reward_dict)
     env.env_info()
 
     [rew, rew_p1, rew_p2], _ = env.test(render=True, visualize_layers=False)
