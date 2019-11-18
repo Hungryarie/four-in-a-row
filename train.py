@@ -12,8 +12,7 @@ from datetime import datetime
 from tqdm import tqdm
 from keras.callbacks import TensorBoard
 
-# custom code
-#from model import 
+# own file imports
 from logandstats import Stats, ModelLog
 
 
@@ -178,7 +177,8 @@ class TrainAgent:
             # train on invalid moves (current player)
             state = self.step_dict['start_state'][self.env.active_player.player_id]      # begin state
             action = self.step_dict['action'][self.env.active_player.player_id]          # action at begin state
-            next_state = self.step_dict['mid_state'][self.env.active_player.player_id]   # state after invalid move => is same as begin state
+            next_state = self.env.make_invalid_state(action, state)                      # make a temporary invalid state to train with
+            # next_state = self.step_dict['mid_state'][self.env.active_player.player_id]   # state after invalid move => is same as begin state
             reward = reward_arr[self.env.active_player.player_id]                        # reward after invalid move
 
             # print("\n----------\n")
