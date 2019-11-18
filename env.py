@@ -1,14 +1,16 @@
-# trying to implement:
+# ref:
 # https://github.com/jaromiru/AI-blog/blob/master/CartPole-DQN.py
 # https://github.com/keon/deep-q-learning/blob/master/ddqn.py
 
-import numpy as np
+
 import random
+import logging
+import numpy as np
 import matplotlib.pyplot as plt
+
 import players
 from game import FiarGame
 from analyse import AnalyseModel
-import logging
 
 
 class environment(FiarGame):
@@ -206,6 +208,8 @@ class environment(FiarGame):
 
                 # print(observation)
                 # print (f"reward: {reward}")
+
+                self.print_feature_space()
 
             if visualize_layers:
                 analyse_model.visual_debug_play(state=observation, turns=self.turns, print_num=True)
