@@ -9,11 +9,19 @@ class FiarGame:
     # REWARD_INVALID_MOVE = -10   #-50  # -10  # -0.5
     # REWARD_STEP = -1  #-5  # -0.5
 
-    def __init__(self, player1, player2):
+    def __init__(self):
 
         self.rows = 6
         self.columns = 7
+        self._extra_toprows = 1  # extra rows at the top of the playingfield (can be used for feature engineering)
 
+        self.playingField = np.zeros([self.rows + self._extra_toprows, self.columns], dtype=int)
+        self.playingField = self.playingField[:, :, np.newaxis]
+        self.featuremap = np.zeros([self.rows + self._extra_toprows, self.columns, 4], dtype=int)
+
+        #self.reset()
+
+    def add_players(self, player1, player2):
         self.player1 = player1
         self.player1.color = "1"
         self.player1.player_id = 1
@@ -27,19 +35,18 @@ class FiarGame:
         self.reset()
 
     def reset(self):
-        self._extra_toprows = 1
-        self.playingField = np.zeros([self.rows + self._extra_toprows, self.columns], dtype=int)
-        self.playingField = self.playingField[:, :, np.newaxis]
-        self.featuremap = np.zeros([self.rows + self._extra_toprows, self.columns, 4], dtype=int)
-        self.winner = 0                       # winner id. 0 is no winner yet
+        self.playingField.fill(0)               # reset array with zero
+        self.featuremap.fill(0)                 # reset array with zero
+
+        self.winner = 0                         # winner id. 0 is no winner yet
         self.winnerhow = "none"
         self.done = False
-        self.turns = 0                       # amount of tries before winning
+        self.turns = 0                          # amount of tries before winning
         self.current_player = random.choice([self.player1.player_id, self.player2.player_id])  # random pick a player to start
         self.current_player_value = self.getPlayerById(self.current_player).value
         self._invalid_move_played = False
         self._invalid_move_count = 0
-        self._invalid_move_action = None  # False
+        self._invalid_move_action = None
         self.prev_invalid_move_count = 0        # for collecting the max in a row invalidmove count
         self.prev_invalid_move_reset = True
 
@@ -53,20 +60,20 @@ class FiarGame:
         self._feature_space_next_move()
 
     def _feature_space_field(self):
-        # layer 0 = the playingField
+        """# layer 0 = the playingField"""
         layer = 0
         self.featuremap_dict['0'] = "the playingField"
         self.featuremap[:, :, layer] = self.playingField[:, :, 0]
 
     def _feature_space_active_player(self):
-        # layer 1 = active player
+        """# layer 1 = active player"""
         layer = 1
         self.featuremap_dict['1'] = "active player"
         active_arr = np.full((self.rows + self._extra_toprows, self.columns), self.current_player_value)
         self.featuremap[:, :, layer] = active_arr
 
     def _feature_space_free_space(self):
-        # layer 2 = free space
+        """# layer 2 = free space"""
         layer = 2
         self.featuremap_dict['2'] = "free space"
         for id_row, row in enumerate(reversed(self.featuremap)):
@@ -77,7 +84,7 @@ class FiarGame:
                     col[layer] = 0
 
     def _feature_space_next_move(self):
-        # layer 3 = next move space
+        """# layer 3 = next move space"""
         layer = 3
         self.featuremap_dict['3'] = "next move space"
 
@@ -91,13 +98,14 @@ class FiarGame:
                     col[layer] = 0
 
     def print_feature_space(self):
-        print("layer 0 = the playingField:")
+        print("Feature space (raw data):")
+        print("> layer 0 = the playingField:")
         print(self.featuremap[:, :, 0])
-        print("\nlayer 1 = active player:")
+        print("\n> layer 1 = active player:")
         print(self.featuremap[:, :, 1])
-        print("\nlayer 2 = free space")
+        print("\n> layer 2 = free space")
         print(self.featuremap[:, :, 2])
-        print("\nlayer 3 = next move space")
+        print("\n> layer 3 = next move space")
         print(self.featuremap[:, :, 3])
         print("\n")
 
@@ -121,13 +129,25 @@ class FiarGame:
         # self.current_player = self.current_player * -1
         self.current_player_value = self.getPlayerById(self.current_player).value
 
-        # enricht the featurespace with the current player
+        # enrich the featurespace with the current player
         # self.enrich_feature_space()  # is already done at env.step()
         self._feature_space_active_player()
         # self.print_feature_space()
 
     def getPlayerById(self, id):
+        """Get the player by there player_id\n\n
+        input: player_id\n
+        output: player instance"""
         if self.player1.player_id == id:
+            return self.player1
+        else:
+            return self.player2
+
+    def get_player_by_value(self, value):
+        """Get the player by there 'raw' value\n\n
+        input: 'raw' value\n
+        output: player instance"""
+        if self.player1.value == value:
             return self.player1
         else:
             return self.player2
@@ -138,14 +158,17 @@ class FiarGame:
         return ActionList
 
     def GetActionSize(self):
+        raise DeprecationWarning
         return self.columns
 
     def GetState(self):
         """flattend array of the state"""
+        raise DeprecationWarning
         flatStateArray = self.playingField.flatten()
         return flatStateArray
 
     def GetObservationSize(self):
+        raise DeprecationWarning
         return len(self.GetState())
 
     def Winnerinfo(self):
@@ -158,15 +181,15 @@ class FiarGame:
         - in # of turns
         """
         if self.winner != 0:
-            return (f"winner:{self.getPlayerById(self.winner).name} "
-                    f"({self.getPlayerById(self.winner).color}), "
-                    f"id:{self.winner}, how:{self.winnerhow}, in #turns:{self.turns}")
+            return (f"winner:{self.get_player_by_value(self.winner).name} "
+                    f"({self.get_player_by_value(self.winner).color}), "
+                    f"id:{self.get_player_by_value(self.winner).player_id}, how:{self.winnerhow}, in #turns:{self.turns}")
         else:
             return ("no winner (yet)")
 
     def CheckGameEnd(self):
         """
-        returns whether the game has ended.
+        returns whether the game has ended. Also sets the self.done flag.
         """
         if self.winner == 0:
             # check for horizontal winner
@@ -248,7 +271,7 @@ class FiarGame:
 
     @staticmethod
     def checkFourOnARow(x):
-        # print ("x:", x)
+        # print(f"x:{x}")
         count = 0
         same = 0
         win = False
@@ -341,6 +364,8 @@ class FiarGame:
             """
         if self._check_invalid_action_type(inColumn):
             # invalid action played
+            self._invalid_move_played = True
+            self._invalid_move_action = inColumn
             return False
 
         # convert to int
@@ -399,7 +424,7 @@ class FiarGame:
     def make_invalid_state(self, action, state):
         """Get the invalid state of an action. Can be used to train with"""
         # print(state[:, :, 0])
-
+        state = np.copy(state)
         if self._extra_toprows == 1:
             state[0, action, 0] = self.active_player.value
             # print(state[:, :, 0])
