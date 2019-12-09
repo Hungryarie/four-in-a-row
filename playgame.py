@@ -24,169 +24,39 @@ from analyse import AnalyseModel
 
 
 def train_in_class():
-    p1 = players.A2CAgent('', '', enriched_features=True)
+
+    # load training parameters
+    param = TrainingParameters()
+
+    # load environment
+    env = environment(reward_dict=param.reward_dict)
+
+    # load models
+    input_shape = env.get_feature_size(enriched=True)  # get environment shape
+    output_num = input_shape[1]
+    actor = func_model1(input_shape=input_shape, output_num=output_num,
+                        par_loss='categorical_crossentropy', par_opt=Adam(lr=0.001), par_metrics='accuracy', par_final_act='softmax', par_layer_multiplier=3)
+    critic = func_model1(input_shape=input_shape, output_num=1,
+                         par_loss='mse', par_opt=Adam(lr=0.005), par_metrics='accuracy', par_final_act='linear', par_layer_multiplier=3)
+
+    # load players
+    p1 = players.A2CAgent(actor, critic, param.DISCOUNT, enriched_features=True)
     p1.name = "A2C on training"
     p2 = players.Selfplay(p1)
     p2.name = "selfplay"
     #p2 = players.Drunk()
     #p2.name = "drunk"
 
-    param = TrainingParameters()
-
-    env = environment(p1, p2, reward_dict=param.reward_dict)
-
-    training = TrainAgent(env, parameters=param, debug_flag=True)
-
-    description = "first test. x=200. CORRECT tau on p1 and p2 "
+    description = f"2nd test. x={param.MAX_INVALID_MOVES}. CORRECT tau on p1 and p2. Extra toprow. forced start of P2. "
     description += f"enr.feature={p1.enriched_features}"
+
+    env.add_players(p1, p2)
+    training = TrainAgent(env, parameters=param, debug_flag=True)
     training.setup_training(train_description=description)
-    training.run_training()
+    training.run_training(start_id=p2.player_id)
     training.save_model(player=p1)  # save model after training
 
 
-def trainA2C():
-
-    # For more repetitive results
-    random.seed(1)
-    np.random.seed(1)
-    tf.set_random_seed(1)
-
-    p1 = players.A2CAgent('', '', enriched_features=False)
-    p1.name = "A2C on training"
-    #Model = load_a_model('models/A2C/1572262959_ep63_actor.model')
-    #p2 = players.Drunk()
-    #p2.name = "drunk"
-    #p2 = players.DDQNPlayer(Model)
-    p2 = players.Selfplay(p1)
-    p2.name = "selfplay"
-
-    env = environment(p1, p2)
-
-    # for stats
-    #log = ModelLog(log_filename, log_flag)
-    #log.add_player_info(p1, p2)
-    #log.add_constants()
-    #log.write_to_csv()
-    #log.write_parameters_to_file()
-    count_stats = Stats()  # set new counterclass
-
-    # setup for training
-    #p2modclass = str(log.model2_class)
-    #p2modclass = p2modclass.replace('/', '')
-    #escription = f"(train1 prob-sample selfplay) vs p2={log.player2_class}@{p2modclass}"
-    description = f"(first test A2C)"
-    tensorboard_dir = "logs(debug)"
-    env.player1.setup_for_training(description=description, dir=tensorboard_dir)
-
-    count_stats.ep_rewards, count_stats.episodes = [0,0,0,0,0], [0,0,0,0,0]  # start with 5 zero's otherwise when calculate if the mean for saving goes wrong.
-
-    # Iterate over episodes
-    for episode in tqdm(range(1, EPISODES + 1), ascii=True, unit='episodes'):
-        done = False
-        episode_reward = 0
-        state = env.reset()
-
-        # Update tensorboard step every episode
-        env.player1.tensorboard.step = episode
-
-        # Restarting episode - reset episode reward and step number
-        episode_reward = 0
-        step = 1
-
-        while not done:
-
-            env.block_invalid_moves(x=10)
-
-            if env.current_player == 1:
-                action = env.player1.select_cell(state=state, actionspace=env.action_space)
-                next_state, [_, reward_p1, _], done, info = env.step(action)
-                if done or env._invalid_move_played:
-                    if env._invalid_move_played:
-                        count_stats.invalidmove_count += 1  # tensorboard stats
-                    env.player1.train_model(state, action, reward_p1, next_state, done)
-            else:
-                # action_opponent = env.get_selfplay_action()
-                action_opponent = env.active_player.select_cell(state=state, actionspace=env.action_space)
-
-                next_state, [_, reward_p1, _], done, info = env.step(action_opponent)
-                if not env._invalid_move_played:
-                    env.player1.train_model(state, action, reward_p1, next_state, done)
-                    step += 1
-
-            if not env._invalid_move_played:
-                if env.player1.render and episode % 50 == 0:
-                    env.render()
-                env.setNextPlayer()
-
-            episode_reward += reward_p1
-            state = next_state
-
-            # for tensorboard stats
-            if env.winner == env.player1.player_id:
-                count_stats.win_count += 1
-            elif env.winner == env.player2.player_id:
-                count_stats.loose_count += 1
-            else:
-                count_stats.draw_count += 1
-            count_stats.turns_count += env.turns
-            if env.winnerhow == "Horizontal":
-                count_stats.count_horizontal += 1
-            if env.winnerhow == "Vertical":
-                count_stats.count_vertical += 1
-            if env.winnerhow == "Diagnal Right":
-                count_stats.count_dia_right += 1
-            if env.winnerhow == "Diagnal Left":
-                count_stats.count_dia_left += 1
-
-        # if done:
-        # every episode, plot the play time
-        # episode_reward = episode_reward if episode_reward == 500.0 else episode_reward + 100
-        # Append episode reward to a list
-        count_stats.ep_rewards.append(episode_reward)
-        # scores.append(episode_reward)
-        count_stats.episodes.append(episode)
-        if episode % 50 == 0:
-
-            #  Calculate over stats
-            count_stats.aggregate_stats(calc_steps=AGGREGATE_STATS_EVERY)
-            # update tensorboard
-            env.player1.tensorboard.update_stats(reward_avg=count_stats.average_reward, reward_min=count_stats.min_reward, reward_max=count_stats.max_reward,
-                                                 epsilon=epsilon,
-                                                 win_count=count_stats.win_count, loose_count=count_stats.loose_count, draw_count=count_stats.draw_count,
-                                                 invalidmove_count=count_stats.invalidmove_count, win_ratio=count_stats.win_ratio,
-                                                 turns_count=count_stats.turns_count, count_horizontal=count_stats.count_horizontal,
-                                                 count_vertical=count_stats.count_vertical, count_dia_left=count_stats.count_dia_left,
-                                                 count_dia_right=count_stats.count_dia_right, reward_std=count_stats.std_reward)
-            # reset stats
-            count_stats.reset_stats()
-
-            ep50 = count_stats.episodes[-min(50, len(count_stats.episodes)):]
-            score50 = count_stats.ep_rewards[-min(50, len(count_stats.ep_rewards)):]
-            plt.figure(figsize=(30, 20))
-            plt.ylim(-300, 300)
-
-            plt.plot(ep50, score50, 'b')
-            # pylab.plot(count_stats.episodes, count_stats.ep_rewards, 'b')
-            try:
-                pylab.savefig(f"output/fourinarow_a2c ep{episode}.png")
-            except Exception:
-                pass
-            plt.close()
-        # print("episode:", episode, "  episode_reward:", episode_reward)
-
-        if episode % 100 == 0:
-            actor_model_name = f'models/A2C/{int(time.time())}_ep{episode}_actor.model'
-            critic_model_name = f'models/A2C/{int(time.time())}_ep{episode}_critic.model'
-            env.player1.actor.save(actor_model_name)
-            env.player1.critic.save(critic_model_name)
-        # if the mean of ep_rewards of last 20 episode is bigger than 190
-        # stop training
-        if np.mean(count_stats.ep_rewards[-min(20, len(count_stats.ep_rewards)):]) > 190:
-            actor_model_name = f'models/A2C/{int(time.time())}_ep{episode}_actor.model'
-            critic_model_name = f'models/A2C/{int(time.time())}_ep{episode}_critic.model'
-            env.player1.actor.save(actor_model_name)
-            env.player1.critic.save(critic_model_name)
-            sys.exit()
 
 
 def trainNN(p1_model=None, p2_model=None, log_flag=True, visualize_layers=False, debug_flag=False):
