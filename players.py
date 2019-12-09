@@ -41,7 +41,7 @@ class Player:
     #    pass
 
     @abstractmethod
-    def select_cell(self, board, state, actionspace, **kwargs):
+    def select_cell(self, state, actionspace, **kwargs):
         pass
 
     # @abstractmethod
@@ -59,7 +59,7 @@ class Player:
     def setup_for_training(self, description=None, dir='logs'):
         """
         Only run this once per trainingsession.
-        Not needed for using the model+agent (it will create an unnecessary tensorboard logfile).
+        Not needed for evaluation of the model+agent (it will create an unnecessary tensorboard logfile).
         -Setup the modified tensorboard.
         -Set the target update counter to zero.
         """
@@ -117,7 +117,7 @@ class Human(Player):
     """
     This player type allow a human player to play the game
     """
-    def select_cell(self, board, state, actionspace, **kwargs):
+    def select_cell(self, state, actionspace, **kwargs):
         cell = input("Select column to fill: ")
         return cell
 
@@ -168,52 +168,43 @@ class Selfplay(Player):
         return policy
 
 
-from keras import Sequential
-from keras.layers import Dense, Flatten
-from keras.optimizers import Adam
+#from keras import Sequential
+#from keras.layers import Dense, Flatten
+#from keras.optimizers import Adam
 class A2CAgent(Player):
-    def __init__(self, actor_model, critic_model, *args, enriched_features=True):
+    def __init__(self, actor_model, critic_model, discount, *args, enriched_features=True):
         """
         A2C(Advantage Actor-Critic) agent\n
         https://github.com/rlcode/reinforcement-learning/blob/master/2-cartpole/4-actor-critic/cartpole_a2c.py
         """
         super().__init__(*args)
-        # if you want to see Cartpole learning, then change to True
-        self.render = True
-        # get size of state and action
-        self.action_size = 7
-        self.value_size = 1
-
-        #
         self.enriched_features = enriched_features
-        if self.enriched_features:
+        """if self.enriched_features:
             self.channels = 4
         else:
-            self.channels = 1
+            self.channels = 1"""
 
         # These are hyper parameters for the Policy Gradient
-        self.discount_factor = 0.99
-        self.actor_lr = 0.001
-        self.critic_lr = 0.005
+        self.discount_factor = discount  # 0.99
+        #self.actor_lr = 0.001
+        #self.critic_lr = 0.005
 
         # create model for policy network
-        self.actor = self.build_actor()
-        self.critic = self.build_critic()
+        self.actor = actor_model.model      # self.build_actor()
+        self.critic = critic_model.model    # self.build_critic()
 
-        # model metadata (temporary here)
-        self.model = empty_model()
-        self.model.model_name = "A2C - dense 1x24"
-        self.model.timestamp = int(time.time())
-        self.model.model_class = self.__class__.__name__
-        self.model.optimizer_name = "Adam"
-        self.model._lr = self.actor_lr
-        self.model.loss = "categorical_crossentropy"
-        self.model.metrics = "accuracy"
-        self.model.fin_activation = "softmax"
+
+        # get size of state and action
+        self.value_size = self.critic.hyper_dict['output_num']  # self.critic.out_num
+        self.action_size = self.actor.hyper_dict['output_num']  # self.actor.out_num
+
+        # model metadata
+        self.model = self.actor     # for usage in setup_for_training() - > needs proper fix!
 
     # approximate policy and value using Neural Network
     # actor: state is input and probability of each action is output of model
     def build_actor(self):
+        raise DeprecationWarning
         actor = Sequential()
         actor.add(Dense(24, input_shape=(6, 7, self.channels), activation='relu',
                         kernel_initializer='he_uniform'))
@@ -229,6 +220,7 @@ class A2CAgent(Player):
 
     # critic: state is input and value of state is output of model
     def build_critic(self):
+        raise DeprecationWarning
         critic = Sequential()
         critic.add(Flatten(input_shape=(6, 7, self.channels)))
         critic.add(Dense(24, activation='relu',
@@ -584,8 +576,8 @@ class DDQNPlayer(Player):
         qs = self.model.predict(np.array(state).reshape(-1, *state.shape) / 1)[0]
         return qs
 
-    def select_cell(self, board, state, actionspace, **kwargs):
-        qs = self.get_qs(board)
+    def select_cell(self, state, actionspace, **kwargs):
+        qs = self.get_qs(state)
         # overrule model probabilties according to the (modified) actionspace
         for key, prob in enumerate(qs):
             if key not in actionspace:
