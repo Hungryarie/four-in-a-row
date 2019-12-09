@@ -11,7 +11,7 @@ from keras import initializers
 
 # from constants import *
 # from game import FiarGame
-# import time
+import time
 # from datetime import datetime
 import numpy as np
 # import matplotlib.pyplot as plt
@@ -59,6 +59,7 @@ class model_base:
         self.opt = par_opt
         self.metrics = par_metrics
         self.fin_activation = par_final_act
+        self.layer_multiplier = kwargs.pop('par_layer_multiplier', 1)
 
         # create models
         self.model = self.create_model(input_shape, output_num)
@@ -76,6 +77,19 @@ class model_base:
         self.model.optimizer_name = self.model.optimizer.__class__.__name__
         self.model.fin_activation = self.fin_activation  # final activation
         # print(self.model.optimizer.get_config())
+        self.model.in_shape = input_shape
+        self.model.out_num = output_num
+
+        self.model.hyper_dict = {}
+        self.model.hyper_dict['model_name'] = None
+        self.model.hyper_dict['timestamp'] = int(time.time())
+        self.model.hyper_dict['model_class'] = self.__class__.__name__
+        self.model.hyper_dict['learning_rate'] = format(K.eval(self.model.optimizer.lr), '.00000g')
+        self.model.hyper_dict['optimizer_name'] = self.model.optimizer.__class__.__name__
+        self.model.hyper_dict['final_activation'] = self.fin_activation
+        self.model.hyper_dict['input_shape'] = input_shape
+        self.model.hyper_dict['output_num'] = output_num
+        self.model.hyper_dict['layer_multiplier'] = self.layer_multiplier
 
         # temporary fix.. see issue #6
         time.sleep(2)  # needed for batch training otherwise with 2 same models there is a possibility that they will be instanciated at the same time, which causes tensorboard to append the logfile  onto each other.
@@ -107,6 +121,7 @@ class model_base:
             loss_name = self.loss
 
         self.model.model_name += f'({loss_name}^{self.model.optimizer_name}^lr={self.model._lr}{clip_string}^{self.fin_activation})'
+        self.model.hyper_dict['model_name'] += f'({loss_name}^{self.model.optimizer_name}^lr={self.model._lr}{clip_string}^{self.fin_activation})'
     """
     def huber_loss(self, y_true, y_pred, clip_delta=1.0):
         # not easy to load model with custom loss function.
@@ -144,6 +159,7 @@ class model1(model_base):
 
         super().__init__(**kwargs)
         self.model.model_name = 'conv3x128'
+        self.model.hyper_dict['model_name'] = self.model.model_name
         self.append_hyperpar_to_name()
 
     def create_model(self, input_shape, output_num):
@@ -170,6 +186,7 @@ class model1b(model_base):
 
         super().__init__(**kwargs)
         self.model.model_name = '3xconv+2xdense'
+        self.model.hyper_dict['model_name'] = self.model.model_name
         self.append_hyperpar_to_name()
 
     def create_model(self, input_shape, output_num):
@@ -197,6 +214,7 @@ class model1c(model_base):
 
         super().__init__(**kwargs)
         self.model.model_name = '3xconv+2xdenseSMALL3x3'
+        self.model.hyper_dict['model_name'] = self.model.model_name
         self.append_hyperpar_to_name()
 
     def create_model(self, input_shape, output_num):
@@ -226,6 +244,7 @@ class model1d(model_base):
 
         super().__init__(**kwargs)
         self.model.model_name = '3xconv+2xdenseSMALL4x4(seq)'
+        self.model.hyper_dict['model_name'] = self.model.model_name
         self.append_hyperpar_to_name()
 
     def create_model(self, input_shape, output_num):
@@ -266,19 +285,22 @@ class func_model1(model_base):
 
         super().__init__(**kwargs)
         self.model.model_name = '3xconv+2xdenseSMALL4x4(func)-HEnormal'
+        self.model.hyper_dict['model_name'] = self.model.model_name
         self.append_hyperpar_to_name()
 
     def create_model(self, input_shape, output_num):
+        multipl = self.layer_multiplier
+
         # This returns a tensor
         inputs = Input(shape=input_shape)
 
         # a layer instance is callable on a tensor, and returns a tensor
-        x = Conv2D(12, (4, 4), input_shape=input_shape, data_format="channels_last", padding='same', activation='relu', kernel_initializer='he_normal')(inputs)
-        x = Conv2D(24, (4, 4), padding='same', activation='relu', kernel_initializer='he_normal')(x)
-        x = Conv2D(48, (4, 4), padding='same', activation='relu', kernel_initializer='he_normal')(x)
+        x = Conv2D(12 * multipl, (4, 4), input_shape=input_shape, data_format="channels_last", padding='same', activation='relu', kernel_initializer='he_normal')(inputs)
+        x = Conv2D(24 * multipl, (4, 4), padding='same', activation='relu', kernel_initializer='he_normal')(x)
+        x = Conv2D(48 * multipl, (4, 4), padding='same', activation='relu', kernel_initializer='he_normal')(x)
         x = Flatten()(x)
-        x = Dense(48, activation='relu', kernel_initializer='he_normal')(x)
-        x = Dense(32, activation='relu', kernel_initializer='he_normal')(x)
+        x = Dense(48 * multipl, activation='relu', kernel_initializer='he_normal')(x)
+        x = Dense(32 * multipl, activation='relu', kernel_initializer='he_normal')(x)
         predictions = Dense(output_num, activation=self.fin_activation, kernel_initializer='he_normal')(x)
 
         # This creates a model that includes
@@ -315,6 +337,7 @@ class func_model_duel1b(model_base):
 
         super().__init__(**kwargs)
         self.model.model_name = 'dueling_3xconv+2xdenseSMALL4x4'
+        self.model.hyper_dict['model_name'] = self.model.model_name
         self.append_hyperpar_to_name()
 
     def create_model(self, input_shape, output_num):
@@ -362,6 +385,7 @@ class func_model_duel1b1(model_base):
 
         super().__init__(**kwargs)
         self.model.model_name = f'dueling_3xconv+2xdenseSMALL4x4+extra dense Functmethod1-HEnormal'
+        self.model.hyper_dict['model_name'] = self.model.model_name
         self.append_hyperpar_to_name()
 
     def create_model(self, input_shape, output_num):
@@ -409,6 +433,7 @@ class func_model_duel1b2(model_base):
 
         super().__init__(**kwargs)
         self.model.model_name = 'dueling_3xconv+2xdenseSMALL4x4+extra dense Functmethod2-HEnormal'
+        self.model.hyper_dict['model_name'] = self.model.model_name
         self.append_hyperpar_to_name()
 
     def create_model(self, input_shape, output_num):
@@ -452,16 +477,17 @@ class model2(model_base):
         kwargs['par_final_act'] = kwargs.pop('par_final_act', 'softmax')
 
         super().__init__(**kwargs)
-        self.model.model_name = 'dense1x64'
+        self.model.model_name = 'dense1x64, HE_normal'
+        self.model.hyper_dict['model_name'] = self.model.model_name
         self.append_hyperpar_to_name()
 
     def create_model(self, input_shape, output_num):
         model = Sequential()
 
         model.add(Flatten())  # converts the 3D feature maps to 1D feature vectors
-        model.add(Dense(64, input_shape=input_shape, activation='relu'))
+        model.add(Dense(64, input_shape=input_shape, activation='relu', kernel_initializer='he_normal'))
 
-        model.add(Dense(output_num, activation=self.fin_activation))
+        model.add(Dense(output_num, activation=self.fin_activation, kernel_initializer='he_normal'))
         # model.compile happens in baseclass method compile_model()
         return model
 
@@ -475,17 +501,18 @@ class model3(model_base):
         kwargs['par_final_act'] = kwargs.pop('par_final_act', 'softmax')
 
         super().__init__(**kwargs)
-        self.model.model_name = 'dense2x64'
+        self.model.model_name = 'dense2x64, HE_normal'
+        self.model.hyper_dict['model_name'] = self.model.model_name
         self.append_hyperpar_to_name()
 
     def create_model(self, input_shape, output_num):
         model = Sequential()
 
         model.add(Flatten())  # converts the 3D feature maps to 1D feature vectors
-        model.add(Dense(64, input_shape=input_shape, activation='relu'))
-        model.add(Dense(64, activation='relu'))
+        model.add(Dense(64, input_shape=input_shape, activation='relu', kernel_initializer='he_normal'))
+        model.add(Dense(64, activation='relu', kernel_initializer='he_normal'))
 
-        model.add(Dense(output_num, activation=self.fin_activation))
+        model.add(Dense(output_num, activation=self.fin_activation, kernel_initializer='he_normal'))
         # model.compile happens in baseclass method compile_model()
         return model
 
@@ -504,6 +531,7 @@ class model4a(model_base):
 
         super().__init__(**kwargs)
         self.model.model_name = 'dense2x128(softmax)(flattenLAST)'
+        self.model.hyper_dict['model_name'] = self.model.model_name
         self.append_hyperpar_to_name()
 
     def create_model(self, input_shape, output_num):
@@ -535,6 +563,7 @@ class model4b(model_base):
 
         super().__init__(**kwargs)
         self.model.model_name = 'dense2x128(softmax)(flattenfirst)'
+        self.model.hyper_dict['model_name'] = self.model.model_name
         self.append_hyperpar_to_name()
 
     def create_model(self, input_shape, output_num):
@@ -560,6 +589,7 @@ class model5(model_base):
 
         super().__init__(**kwargs)
         self.model.model_name = 'dense4x64'
+        self.model.hyper_dict['model_name'] = self.model.model_name
         self.append_hyperpar_to_name()
 
     def create_model(self, input_shape, output_num):
@@ -597,6 +627,7 @@ class func_model5(model_base):
 
         super().__init__(**kwargs)
         self.model.model_name = 'func_dense4x64-HEnormal'
+        self.model.hyper_dict['model_name'] = self.model.model_name
         self.append_hyperpar_to_name()
 
     def create_model(self, input_shape, output_num):
@@ -636,6 +667,7 @@ class func_model5_duel1(model_base):
 
         super().__init__(**kwargs)
         self.model.model_name = 'dueling_dense4x64-HEnormal'
+        self.model.hyper_dict['model_name'] = self.model.model_name
         self.append_hyperpar_to_name()
 
     def create_model(self, input_shape, output_num):
