@@ -53,29 +53,35 @@ class TrainAgent:
 
         # for stats
         self.log = ModelLog(log_filename, log_flag)
-        self.log.add_player_info(self.env.player1, self.env.player2)
+        # self.log.add_player_info_old(self.env.player1, self.env.player2)
+        self.log.add_player_info(self.env.player1)
+        self.log.add_player_info(self.env.player2)
+        self.log.add_modelinfo(1, self.env.player1.actor, "actor")
+        self.log.add_modelinfo(1, self.env.player1.critic, "critic")
         self.log.add_constants(self.para)
         self.log.write_to_csv()
         self.log.write_parameters_to_file()
+
         self.count_stats = Stats()  # set new counter class
 
     def setup_training(self, train_description):
         # setup tensorboard for training
-        p2modclass = str(self.log.model2_class)
+        # p2modclass = str(self.log.model2_class)
+        p2modclass = self.log.get_info(2, "model_class")
         p2modclass = p2modclass.replace('/', '')
-        description = f"({train_description}) vs p2={self.log.player2_class}@{p2modclass}"
+        description = f"({train_description}) vs p2={self.env.player2.player_class}@{p2modclass}"
         self.env.player1.setup_for_training(description=description, dir=self.tensorboard_dir)
 
         self.log.log_text_to_file(f"Training description: {description}\n")
 
-    def run_training(self):
+    def run_training(self, start_id=None):
         self.log.log_text_to_file(f"start training at: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n")
 
         # Iterate over episodes
         for self.count_stats.episode in tqdm(range(1, self.para.EPISODES + 1), ascii=True, unit=' episodes'):
 
             # Restarting episode - reset episode reward
-            state = self.env.reset()
+            state = self.env.reset(start_id=start_id)
             self.step_dict['mid_state'][self.env.inactive_player.player_id] = state
             done = False
             self.count_stats.episode_reward = 0
@@ -107,14 +113,21 @@ class TrainAgent:
                 self.count_stats.episode_reward += reward_p1
 
                 # render every x episodes
-                if not self.env._invalid_move_played and self.env.player1.render and self.count_stats.episode % self.para.AGGREGATE_STATS_EVERY == 0:
+                if not self.env._invalid_move_played and self.para.SHOW_PREVIEW and self.count_stats.episode % self.para.AGGREGATE_STATS_EVERY == 0:
                     self.env.render()
+                    print('\n')
 
                 # change player after a valid move
                 if not self.env._invalid_move_played and not done:
                     self.env.setNextPlayer()
 
             # episode is ended
+            if self.para.SHOW_PREVIEW and self.count_stats.episode % self.para.AGGREGATE_STATS_EVERY == 0:
+                # show winner info
+                print(self.env.Winnerinfo())
+                # print episode reward
+                self.print_reward(self.count_stats.episode, self.count_stats.episode_reward)
+
             # collect stats for tensorboard after every episode
             self.collect_stats()
 
@@ -123,9 +136,6 @@ class TrainAgent:
 
             # save an image every x episode
             self.save_img(per_x_episode=self.para.AGGREGATE_STATS_EVERY)
-
-            # print episode reward
-            # self.print_reward(self.count_stats.episode, self.count_stats.episode_reward)
 
             # save model every x episodes
             if self.count_stats.episode % 100 == 0:
@@ -177,8 +187,11 @@ class TrainAgent:
             # train on invalid moves (current player)
             state = self.step_dict['start_state'][self.env.active_player.player_id]      # begin state
             action = self.step_dict['action'][self.env.active_player.player_id]          # action at begin state
-            next_state = self.env.make_invalid_state(action, state)                      # make a temporary invalid state to train with
-            # next_state = self.step_dict['mid_state'][self.env.active_player.player_id]   # state after invalid move => is same as begin state
+            if self.env.active_player.enriched_features and self.env._extra_toprows > 0:
+                # make a temporary invalid state, based on the current state + action (coin will be added to toprow)
+                next_state = self.env.make_invalid_state(action, state)                      # make a temporary invalid state to train with
+            else:
+                next_state = self.step_dict['mid_state'][self.env.active_player.player_id]   # state after invalid move => is same as begin state
             reward = reward_arr[self.env.active_player.player_id]                        # reward after invalid move
 
             # print("\n----------\n")
