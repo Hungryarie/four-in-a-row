@@ -16,29 +16,46 @@ from analyse import AnalyseModel
 class environment(FiarGame):
     def __init__(self, *args, reward_dict):
 
-        super().__init__(*args)
-
-        self.observation_space_n = self.GetObservationSize()
-        self.observation_max = self.player1.value  # equals 1
-        self.observation_min = self.player2.value  # equals -1
-        self.action_space = self.GetActionSpace()
-        self.action_space_n = self.GetActionSize()
+        super().__init__()  # basic parameters (playingfield/featurnmap init)
 
         self.reward_dict = reward_dict
 
-    def reset(self):
+    def reset(self, start_id=None):
         """
         resets the game and
         returns the observationspace / state, reward, done, info
+
+        inputs: start_id (optional). Give the player_id who will start. Otherwise random.
         """
         super().reset()
         self.action_space = self.GetActionSpace()
+
+        if start_id is not None:
+            # overrule the random player start and forces the given player to start
+            self.current_player = start_id  # pick a player to start
+            self.current_player_value = self.getPlayerById(self.current_player).value
+            self._feature_space_active_player()
 
         if self.active_player.enriched_features:
         # if self.enriched_features:
             return self.featuremap
         else:
             return self.playingField
+
+    def add_players(self, p1, p2):
+        super().add_players(p1, p2)
+
+        # self.observation_space_n = self.GetObservationSize()
+        self.observation_max = self.player1.value  # equals 1
+        self.observation_min = self.player2.value  # equals -1
+        #self.action_space = self.GetActionSpace()
+        #self.action_space_n = self.GetActionSize()
+
+    def get_feature_size(self, enriched=False):
+        if enriched:
+            return self.featuremap.shape
+        else:
+            return self.playingField.shape
 
     def render(self):
         """
@@ -47,8 +64,9 @@ class environment(FiarGame):
         self.ShowField2()
 
     def env_info(self):
-        print(f"player 1:{self.player1.name}, coin:{self.player1.color}, type:{type(self.player1)}")
-        print(f"player 2:{self.player2.name}, coin:{self.player2.color}, type:{type(self.player2)}")
+        print("Player info:")
+        print(f" - player 1:{self.player1.name}, coin:{self.player1.color}, type:{type(self.player1)}")
+        print(f" - player 2:{self.player2.name}, coin:{self.player2.color}, type:{type(self.player2)}")
 
     def sample(self):
         """
@@ -60,6 +78,7 @@ class environment(FiarGame):
     def get_selfplay_action(self):
         """get the selfplay action by reversing the playingfield and using the policy from the agent who is training"""
         warnings.warn("deprecated. Is being replaced by player.SelfPlay class", DeprecationWarning)
+        raise DeprecationWarning
 
         # print("###start###")
         # self.print_feature_space()
@@ -179,7 +198,7 @@ class environment(FiarGame):
             self.block_invalid_moves(x=1)
 
             if render:
-                print(f"> Turn: {self.active_player.name} ({self.active_player.color})")
+                print(f"> Turn: {self.active_player.name} (p{self.active_player.player_id}) (coin:{self.active_player.color})")
                 print(f' > Actionspace: {self.action_space}')
 
             if self.active_player.enriched_features:
@@ -188,10 +207,10 @@ class environment(FiarGame):
             else:
                 state = self.playingField
 
-            action = self.active_player.select_cell(board=state, state=self.GetState(), actionspace=self.action_space)
+            action = self.active_player.select_cell(state=state, actionspace=self.action_space)
             observation, reward, done, info = self.step(action)
 
-            if not self._invalid_move_played:
+            if not self._invalid_move_played and not done:
                 self.setNextPlayer()
             ep_reward += reward[0]  # reward default to player 1
             ep_reward_p1 += reward[1]   # reward for player 1
@@ -209,7 +228,7 @@ class environment(FiarGame):
                 # print(observation)
                 # print (f"reward: {reward}")
 
-                self.print_feature_space()
+                #self.print_feature_space()
 
             if visualize_layers:
                 analyse_model.visual_debug_play(state=observation, turns=self.turns, print_num=True)
