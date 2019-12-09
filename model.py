@@ -77,8 +77,9 @@ class model_base:
         self.model.optimizer_name = self.model.optimizer.__class__.__name__
         self.model.fin_activation = self.fin_activation  # final activation
         # print(self.model.optimizer.get_config())
-        self.model.in_shape = input_shape
-        self.model.out_num = output_num
+
+        # self.model.in_shape = input_shape
+        # self.model.out_num = output_num
 
         self.model.hyper_dict = {}
         self.model.hyper_dict['model_name'] = None
