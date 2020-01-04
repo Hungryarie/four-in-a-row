@@ -15,8 +15,8 @@ class TrainingParameters():
         self.MAX_INVALID_MOVES = 200
 
         # Exploration settings
-        self.EPSILON_DECAY = 0.99975
-        self.MIN_EPSILON = 0.001
+        self.EPSILON_DECAY = 0.99975 # 0.99900
+        self.MIN_EPSILON = 0.001 # 0.25 
 
         #  Stats settings
         self.AGGREGATE_STATS_EVERY = 50  # episodes
@@ -28,4 +28,4 @@ class TrainingParameters():
         self.reward_dict['lose'] = -100
         self.reward_dict['tie'] = -99
         self.reward_dict['invalid'] = -10
-        self.reward_dict['step'] = -0.5
+        self.reward_dict['step'] = 0 # -0.5
