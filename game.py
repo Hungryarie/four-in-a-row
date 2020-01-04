@@ -97,16 +97,18 @@ class FiarGame:
                 else:
                     col[layer] = 0
 
-    def print_feature_space(self):
+    def print_feature_space(self, field=None):
+        if field is None:
+            field = self.featuremap
         print("Feature space (raw data):")
         print("> layer 0 = the playingField:")
-        print(self.featuremap[:, :, 0])
+        print(field[:, :, 0])
         print("\n> layer 1 = active player:")
-        print(self.featuremap[:, :, 1])
+        print(field[:, :, 1])
         print("\n> layer 2 = free space")
-        print(self.featuremap[:, :, 2])
+        print(field[:, :, 2])
         print("\n> layer 3 = next move space")
-        print(self.featuremap[:, :, 3])
+        print(field[:, :, 3])
         print("\n")
 
     @property
@@ -158,7 +160,6 @@ class FiarGame:
         return ActionList
 
     def GetActionSize(self):
-        raise DeprecationWarning
         return self.columns
 
     def GetState(self):
