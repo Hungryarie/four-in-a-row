@@ -31,6 +31,10 @@ class Player:
 
         self.enriched_features = False
 
+        self.last_argmax = 0
+        self.count_argmax_shift = 0
+        self.policy_counter = 0
+
     # def shutdown(self):
     #    pass
 
@@ -39,6 +43,9 @@ class Player:
 
     # def save(self, filename):
     #    pass
+
+    def preprocess(self, state, actionspace, **kwargs):
+        pass
 
     @abstractmethod
     def select_cell(self, state, actionspace, **kwargs):
@@ -103,7 +110,10 @@ class Player:
             probs = exp_values / np.sum(exp_values)
             # probs2 = np.true_divide(exp_values, np.sum(exp_values))
             action = np.random.choice(range(nb_actions), p=probs)
-            # print(probs)
+
+            self.set_policy_info(q_values)
+            self.print_probability_info(probs, action)
+
         except RuntimeWarning:
             action = np.random.choice(actionspace)
         except ValueError:
@@ -111,6 +121,29 @@ class Player:
             action = np.random.choice(actionspace)
 
         return action
+
+    def set_policy_info(self, policy):
+        self.last_policy = policy
+        self.certainty_indicator = max(policy) - min(policy)
+
+        self.prev_argmax = self.last_argmax
+        self.last_argmax = np.argmax(policy)
+        self.policy_counter += 1
+        if self.prev_argmax != self.last_argmax:
+            self.count_argmax_shift += 1
+
+    def get_policy_info(self):
+        self.changiness = self.count_argmax_shift / self.policy_counter
+
+        # reset
+        self.policy_counter = 0
+        self.count_argmax_shift = 0
+
+        return self.changiness
+
+    def print_probability_info(self, probs, action):
+        print(f"raw q: {np.round(self.last_policy, 3)} -> argmax: {np.argmax(self.last_policy)}")
+        print(f"probs: {np.round(probs, 3)} -> action: {action}")
 
 
 class Human(Player):
@@ -138,6 +171,32 @@ class Drunk(Player):
     def get_prob_action(self, *args, **kwargs):
         logging.error("Drunk class has no probability action")
         return np.random.choice(actionspace)
+
+
+class Stick(Player):
+    """
+    Stick player always selects the same move, until column is full.
+    """
+    def __init__(self):
+        super().__init__()
+        self.column = np.random.choice([0, 1, 2, 3, 4, 5, 6])
+
+    def preprocess(self, state, actionspace, **kwargs):
+        pass
+
+    def select_cell(self, state, actionspace, **kwargs):
+        # return random.randint(0,np.size(board,1)-1)
+        # return random.randint(min(actionspace), max(actionspace))
+        if self.column not in actionspace:
+            self.column = np.random.choice(actionspace)
+
+        return self.column
+
+    def get_prob_action(self, *args, **kwargs):
+        #logging.error("Stick class has no probability action")
+        action = self.select_cell(*args, **kwargs)
+
+        return action
 
 
 class Selfplay(Player):
@@ -272,7 +331,8 @@ class A2CAgent(Player):
         next_state = next_state[np.newaxis, :, :]
 
         target = np.zeros((1, self.value_size))
-        advantages = np.zeros((1, self.action_size))
+        #advantages = np.zeros((1, self.action_size))
+        advantages = self.actor.predict(state)
 
         value = self.critic.predict(state)[0]
         next_value = self.critic.predict(next_state)[0]
