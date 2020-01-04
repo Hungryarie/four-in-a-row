@@ -632,14 +632,16 @@ class func_model5(model_base):
         self.append_hyperpar_to_name()
 
     def create_model(self, input_shape, output_num):
+        multipl = self.layer_multiplier
+
         # This returns a tensor
         inputs = Input(shape=input_shape)
 
         x = Flatten()(inputs)  # converts the 3D feature maps to 1D feature vectors
-        x = Dense(64, activation='relu', kernel_initializer='he_normal')(x)
-        x = Dense(64, activation='relu', kernel_initializer='he_normal')(x)
-        x = Dense(64, activation='relu', kernel_initializer='he_normal')(x)
-        x = Dense(64, activation='relu', kernel_initializer='he_normal')(x)
+        x = Dense(64 * multipl, activation='relu', kernel_initializer='he_normal')(x)
+        x = Dense(64 * multipl, activation='relu', kernel_initializer='he_normal')(x)
+        x = Dense(64 * multipl, activation='relu', kernel_initializer='he_normal')(x)
+        x = Dense(64 * multipl, activation='relu', kernel_initializer='he_normal')(x)
 
         predictions = Dense(output_num, activation=self.fin_activation)(x)
         model = FuncModel(inputs=inputs, outputs=predictions)
