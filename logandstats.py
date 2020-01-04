@@ -38,10 +38,11 @@ class Stats:
         except ZeroDivisionError:
             self.win_ratio = 0.5
         self.turns_count = self.turns_count / calc_steps
-        self.count_horizontal = self.count_horizontal / calc_steps
-        self.count_vertical = self.count_vertical / calc_steps
-        self.count_dia_left = self.count_dia_left / calc_steps
-        self.count_dia_right = self.count_dia_right / calc_steps
+        total_wins = max(self.count_horizontal + self.count_vertical + self.count_dia_left + self.count_dia_right, 1)
+        self.count_horizontal = self.count_horizontal / total_wins
+        self.count_vertical = self.count_vertical / total_wins
+        self.count_dia_left = self.count_dia_left / total_wins
+        self.count_dia_right = self.count_dia_right / total_wins
         self.average_reward = sum(self.ep_rewards[-calc_steps:]) / len(self.ep_rewards[-calc_steps:])
         self.min_reward = min(self.ep_rewards[-calc_steps:])
         self.max_reward = max(self.ep_rewards[-calc_steps:])
