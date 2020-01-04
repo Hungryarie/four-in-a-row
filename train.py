@@ -43,6 +43,7 @@ class TrainAgent:
             self.tensorboard_dir = 'logs(debug)'
             logging.basicConfig(level=logging.DEBUG)
         else:
+            log_flag = True
             log_filename = 'parameters'
             self.tensorboard_dir = 'logs'
             logging.basicConfig(level=logging.WARNING)
@@ -106,7 +107,7 @@ class TrainAgent:
                 if self.env._invalid_move_played and self.env.current_player == 1:
                     self.count_stats.invalidmove_count += 1  # tensorboard stats
 
-                if self.env.prev_invalid_move_reset:
+                if self.env.prev_invalid_move_reset and self.env.current_player == 1:
                     # only collect the succesive invalidmove count
                     self.count_stats.invalidmove_count_succesive += self.env.prev_invalid_move_count
 
@@ -131,6 +132,9 @@ class TrainAgent:
             # collect stats for tensorboard after every episode
             self.collect_stats()
 
+            print(f"certainty: {np.round(self.env.player1.certainty_indicator, 3)}")
+            print(f"changiness: {np.round(self.env.player1.get_policy_info(), 4)}")
+
             # update tensorboard every x episode
             self.update_tensorboard(per_x_episode=self.para.AGGREGATE_STATS_EVERY)
 
@@ -152,6 +156,8 @@ class TrainAgent:
         mid_state = new state after the chosen action is played
 
         """
+        # ACTION PART
+
         # get start state = mid state of opponent
         # self.step_dict['start_state'][self.env.active_player.player_id] = np.copy(self.step_dict['mid_state'][self.env.inactive_player.player_id])
         self.step_dict['start_state'][self.env.active_player.player_id] = np.copy(self.env.featuremap)
@@ -162,7 +168,8 @@ class TrainAgent:
             # use exploration for player 1 and 2
             # get probability based action
             self.count_stats.tau = self.count_stats.epsilon
-            action = self.env.active_player.get_prob_action(state=state, actionspace=self.env.action_space, tau=self.count_stats.tau)
+            #action = self.env.active_player.get_prob_action(state=state, actionspace=self.env.action_space, tau=self.count_stats.tau)
+            action = self.env.active_player.get_prob_action(state=state, actionspace=self.env.action_space, tau=0.16)
         else:
             action = self.env.active_player.select_cell(state=state, actionspace=self.env.action_space)
 
@@ -181,7 +188,9 @@ class TrainAgent:
         # log next state =
         # self.step_dict['next_state'][self.env.active_player.player_id] = self.step_dict['mid_state'][self.env.inactive_player.player_id]
 
-        # TRAIN after the opponents move (or on a current played invalid move).
+        # TRAINING PART
+
+        #  after the opponents move (or on a current played invalid move).
         #  Training step is based on previous step. (because the new state is when the next player has made his move)
         if self.env._invalid_move_played:
             # train on invalid moves (current player)
@@ -233,20 +242,41 @@ class TrainAgent:
 
         # train one final time when done==true. Otherwise the final (most important! => win/lose) action is not being trained on.
         if done:
-            # (current player)
-            # get state, action and reward for winner, because above is based on previous step it is always the losing step.
-            state = self.step_dict['start_state'][self.env.active_player.player_id]     # begin state
-            action = self.step_dict['action'][self.env.active_player.player_id]         # action at begin state
-            next_state = self.step_dict['mid_state'][self.env.active_player.player_id]  # state after winning move
-            reward = reward_arr[self.env.active_player.player_id]                       # reward after winning move
+            """self.env.ShowField2()
+            print(self.env.Winnerinfo())"""
 
-            # print("\n----------\n")
-            # self.env.ShowField2(field=state)
-            # print(f"\naction:{action}\n")
-            # self.env.ShowField2(field=next_state)
-
+            # (active player: winner)
+            # get state, action and reward for winner.
+            state = self.step_dict['start_state'][self.env.active_player.player_id]         # begin state
+            action = self.step_dict['action'][self.env.active_player.player_id]             # action at begin state
+            next_state = self.step_dict['mid_state'][self.env.active_player.player_id]      # state after winning move
+            reward = reward_arr[self.env.active_player.player_id]                           # reward after winning move
+            
+            """self.env.print_feature_space(field=state)
+            print(f"\naction:{action}\n")
+            self.env.print_feature_space(field=next_state)
+            print("\n----------\n")
+            self.env.ShowField2(field=state)
+            print(f"\naction:{action}\n")
+            self.env.ShowField2(field=next_state)"""
             self.env.active_player.train_model(state, action, reward, next_state, done)
-            # self.env.player1.train_model(state, action, reward, next_state, done)
+
+            # (inactive player : loser)
+            # get state, action and reward for loser, because it is based on previous step it is always the losing step.
+            state = self.step_dict['start_state'][self.env.inactive_player.player_id]     # begin state
+            action = self.step_dict['action'][self.env.inactive_player.player_id]         # action at begin state
+            next_state = np.copy(self.step_dict['mid_state'][self.env.active_player.player_id])  # state after opponents move
+            next_state[:, :, 1] = self.env.active_player.inverse_state(next_state[:, :, 1])  # inverse players turn to simulate is is realy the next state and their turn.
+            reward = reward_arr[self.env.inactive_player.player_id]                       # reward after winning move
+
+            """self.env.print_feature_space(field=state)
+            print(f"\naction:{action}\n")
+            self.env.print_feature_space(field=next_state)
+            print("\n----------\n")
+            self.env.ShowField2(field=state)
+            print(f"\naction:{action}\n")
+            self.env.ShowField2(field=next_state)"""
+            self.env.inactive_player.train_model(state, action, reward, next_state, done)
 
         """
         print(reward_arr)
@@ -285,19 +315,18 @@ class TrainAgent:
 
         if self.env.winner == self.env.player1.value:
             self.count_stats.win_count += 1
+            if self.env.winnerhow == "Horizontal":
+                self.count_stats.count_horizontal += 1
+            if self.env.winnerhow == "Vertical":
+                self.count_stats.count_vertical += 1
+            if self.env.winnerhow == "Diagnal Right":
+                self.count_stats.count_dia_right += 1
+            if self.env.winnerhow == "Diagnal Left":
+                self.count_stats.count_dia_left += 1
         elif self.env.winner == self.env.player2.value:
             self.count_stats.loose_count += 1
         else:
             self.count_stats.draw_count += 1
-
-        if self.env.winnerhow == "Horizontal":
-            self.count_stats.count_horizontal += 1
-        if self.env.winnerhow == "Vertical":
-            self.count_stats.count_vertical += 1
-        if self.env.winnerhow == "Diagnal Right":
-            self.count_stats.count_dia_right += 1
-        if self.env.winnerhow == "Diagnal Left":
-            self.count_stats.count_dia_left += 1
 
         # Append episode reward to a list (for ghraphing)
         self.count_stats.ep_rewards.append(self.count_stats.episode_reward)
