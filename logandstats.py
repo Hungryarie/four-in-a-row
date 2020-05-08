@@ -16,6 +16,7 @@ class Stats:
         self.tau = 0
         self.episode = 0
         self.episodes = []
+        self.chosen_column = [[], [], []]
 
     def reset_stats(self):
         """Reset stats"""
@@ -31,6 +32,7 @@ class Stats:
         self.count_vertical = 0
         self.count_dia_right = 0
         self.count_dia_left = 0
+        self.chosen_column = [[], [], []]
 
     def aggregate_stats(self, calc_steps):
         try:
@@ -73,7 +75,7 @@ class ModelLog():
 
     def add_modelinfo(self, player_id, model, model_info):
         """add model info to dictionary\n\n
-        input: 
+        input:
          - player_id -> to assign the model to the correct player\n
          - model -> model where the info is distilled from.\n
          - model_info -> extra info about the model\n
@@ -254,8 +256,8 @@ class ModelLog():
         with open(f'{self.logfilepath}.csv', mode='a+', newline='') as parameters_file:
             parameter_writer = csv.writer(parameters_file, delimiter=';', quotechar='"', quoting=csv.QUOTE_MINIMAL)
 
-            #parameter_writer.writerow([self.timestamp, self.timenow, 1, self.player1_class, self.player1_name, self.model1_class, self.model1_name, self.model1_loss, self.model1_opt_name, self.model1_lr, self.model1_timestamp, self.model1_fullname, self.model1_used_path])
-            #parameter_writer.writerow([self.timestamp, self.timenow, 2, self.player2_class, self.player2_name, self.model2_class, self.model2_name, self.model2_loss, self.model2_opt_name, self.model2_lr, self.model2_timestamp, self.model2_fullname, self.model2_used_path])
+            # parameter_writer.writerow([self.timestamp, self.timenow, 1, self.player1_class, self.player1_name, self.model1_class, self.model1_name, self.model1_loss, self.model1_opt_name, self.model1_lr, self.model1_timestamp, self.model1_fullname, self.model1_used_path])
+            # parameter_writer.writerow([self.timestamp, self.timenow, 2, self.player2_class, self.player2_name, self.model2_class, self.model2_name, self.model2_loss, self.model2_opt_name, self.model2_lr, self.model2_timestamp, self.model2_fullname, self.model2_used_path])
             for i in range(1, 3):
                 parameter_writer.writerow([self.timestamp, self.timenow, i, self.get_info(i, "player_class"), self.get_info(i, "player_name"), self.get_info(i, "model_class"), self.get_info(i, "model_name"), self.get_info(i, "model_loss"), self.get_info(i, "model_opt_name"), self.get_info(i, "model_lr"), self.get_info(i, "model_timestamp"), self.get_info(i, "model_fullname"), self.get_info(i, "model_used_path")])
         parameters_file.close()
