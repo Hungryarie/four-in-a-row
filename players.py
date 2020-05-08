@@ -6,6 +6,7 @@ import tensorflow.keras.optimizers as ko
 from tensorflow.keras.utils import plot_model
 from collections import deque
 import time
+import os
 
 # own file imports
 # from constants import *
@@ -76,7 +77,8 @@ class Player:
             else:
                 description = ""
             # setup custom tensorboard object
-            self.tensorboard = ModifiedTensorBoard(log_dir=f"{dir}/{self.model.model_class}-{self.model.model_name}-{self.model.timestamp}{description}")
+            log_dir = os.path.normpath(os.path.join(os.getcwd(), dir, f"{self.model.model_class}-{self.model.model_name}-{self.model.timestamp}{description}"))
+            self.tensorboard = ModifiedTensorBoard(log_dir=f"{log_dir}")
 
             # Used to count when to update target network with main network's weights
             self.target_update_counter = 0
@@ -373,8 +375,9 @@ class DDQNPlayer(Player):
             self.model_trained_on_player_id = None
 
         # An array with last n steps for training
+        REPLAY_MEMORY_SIZE = 1000
         self.replay_memory = deque(maxlen=REPLAY_MEMORY_SIZE)
-
+        AGGREGATE_STATS_EVERY = 50
         self.max_q_list = deque(maxlen=AGGREGATE_STATS_EVERY)
         self.delta_q_list = deque(maxlen=AGGREGATE_STATS_EVERY)
 
