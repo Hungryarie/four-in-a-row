@@ -1,13 +1,13 @@
 import tensorflow as tf
 # from keras.callbacks import TensorBoard
 
-from keras import Sequential
-from keras.models import load_model, Model as FuncModel
-from keras.layers import Dense, Dropout, Conv2D, MaxPooling2D, Activation, Flatten
-from keras.layers import Input, Add, Subtract, Lambda, concatenate, add  # functional API specific
-import keras.backend as K
-from keras.optimizers import Adam, SGD, RMSprop
-from keras import initializers
+from tensorflow.keras import Sequential
+from tensorflow.keras.models import load_model, Model as FuncModel
+from tensorflow.keras.layers import Dense, Dropout, Conv2D, MaxPooling2D, Activation, Flatten
+from tensorflow.keras.layers import Input, Add, Subtract, Lambda, concatenate, add  # functional API specific
+import tensorflow.keras.backend as K
+from tensorflow.keras.optimizers import Adam, SGD, RMSprop
+from tensorflow.keras import initializers
 
 # from constants import *
 # from game import FiarGame
