@@ -10,7 +10,7 @@ import matplotlib.pyplot as plt
 
 from datetime import datetime
 from tqdm import tqdm
-from keras.callbacks import TensorBoard
+from tensorflow.keras.callbacks import TensorBoard
 
 # own file imports
 from logandstats import Stats, ModelLog
@@ -33,7 +33,7 @@ class TrainAgent:
         # For more repetitive results
         random.seed(1)
         np.random.seed(1)
-        tf.set_random_seed(1)
+        tf.random.set_seed(1) #changed for TF2 support
 
         # debug
         self.debug = debug_flag
@@ -137,6 +137,8 @@ class TrainAgent:
 
             # update tensorboard every x episode
             self.update_tensorboard(per_x_episode=self.para.AGGREGATE_STATS_EVERY)
+            #test histogram
+            self.env.player1.tensorboard.update_hist(policyCentainty=self.env.player1.last_policy)
 
             # save an image every x episode
             self.save_img(per_x_episode=self.para.AGGREGATE_STATS_EVERY)
@@ -183,6 +185,9 @@ class TrainAgent:
 
         # log taken action
         self.step_dict['action'][self.env.active_player.player_id] = action
+        # add for logging/debugging purposes
+        self.count_stats.chosen_column[self.env.active_player.player_id].append(action)
+
         # log state after action
         self.step_dict['mid_state'][self.env.active_player.player_id] = np.copy(next_state)
         # log next state =
@@ -251,7 +256,7 @@ class TrainAgent:
             action = self.step_dict['action'][self.env.active_player.player_id]             # action at begin state
             next_state = self.step_dict['mid_state'][self.env.active_player.player_id]      # state after winning move
             reward = reward_arr[self.env.active_player.player_id]                           # reward after winning move
-            
+
             """self.env.print_feature_space(field=state)
             print(f"\naction:{action}\n")
             self.env.print_feature_space(field=next_state)
@@ -307,6 +312,7 @@ class TrainAgent:
                                                       count_vertical=self.count_stats.count_vertical, count_dia_left=self.count_stats.count_dia_left,
                                                       count_dia_right=self.count_stats.count_dia_right, reward_std=self.count_stats.std_reward,
                                                       tau=self.count_stats.tau)
+            self.env.player1.tensorboard.update_hist(p1_column=self.count_stats.chosen_column[1][1:], p2_column=self.count_stats.chosen_column[2][1:])
             # reset stats
             self.count_stats.reset_stats()
 
@@ -339,8 +345,12 @@ class TrainAgent:
         timestamp = player.model.timestamp
         actor_model_name = f'models/A2C/{timestamp}-{int(time.time())}_ep{self.count_stats.episode}_actor.model'
         critic_model_name = f'models/A2C/{timestamp}-{int(time.time())}_ep{self.count_stats.episode}_critic.model'
-        player.actor.save(actor_model_name)
-        player.critic.save(critic_model_name)
+
+        actor_path = os.path.normpath(os.path.join(os.getcwd(), actor_model_name))
+        critic_path = os.path.normpath(os.path.join(os.getcwd(), critic_model_name))
+
+        player.actor.save(actor_path)
+        player.critic.save(critic_path)
 
     def save_img(self, per_x_episode):
         if self.count_stats.episode % per_x_episode == 0:
@@ -365,7 +375,9 @@ class ModifiedTensorBoard(TensorBoard):
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
         self.step = 1
-        self.writer = tf.summary.FileWriter(self.log_dir)
+        self._log_write_dir = self.log_dir  # argument self._log_write_dir is needed. so 
+        #self.writer = tf.summary.FileWriter(self.log_dir)
+        self.writer = tf.summary.create_file_writer(self.log_dir)  # changed for tf2 support
 
     # Overriding this method to stop creating default log writer
     def set_model(self, model):
@@ -375,6 +387,7 @@ class ModifiedTensorBoard(TensorBoard):
     # (otherwise every .fit() will start writing from 0th step)
     def on_epoch_end(self, epoch, logs=None):
         self.update_stats(**logs)
+        self.update_hist(**logs)
 
     # Overrided
     # We train for one batch only, no need to save anything at epoch end
@@ -388,4 +401,15 @@ class ModifiedTensorBoard(TensorBoard):
     # Custom method for saving own metrics
     # Creates writer, writes custom metrics and closes writer
     def update_stats(self, **stats):
-        self._write_logs(stats, self.step)
+        #self._write_logs(stats, self.step)  # old tf1
+        with self.writer.as_default():
+            #tf.summary.scalar(name='test', data=1.0, step=self.step)
+            for key, value in stats.items():
+                tf.summary.scalar(name=key, data=value, step=self.step)
+            #self.writer.flush()
+
+    def update_hist(self, **hist):
+        #self._write_logs(stats, self.step)  # old tf1
+        with self.writer.as_default():
+            for key, value in hist.items():
+                tf.summary.histogram(name=key, data=value, step=self.step)
