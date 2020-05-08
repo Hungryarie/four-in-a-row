@@ -2,10 +2,12 @@ import numpy as np
 import random
 import matplotlib.pyplot as plt
 import pylab
-from keras.optimizers import Adam, SGD, RMSprop
+import tensorflow as tf
+from tensorflow.keras.optimizers import Adam, SGD, RMSprop
+# from keras.optimizers import Adam, SGD, RMSprop
 from tqdm import tqdm
 import os
-import tensorflow as tf
+
 import time
 from datetime import datetime
 import logging
@@ -34,21 +36,22 @@ def train_in_class():
     # load models
     input_shape = env.get_feature_size(enriched=True)  # get environment shape
     output_num = input_shape[1]
-    actor = func_model5(input_shape=input_shape, output_num=output_num,
-                        par_loss='categorical_crossentropy', par_opt=Adam(lr=0.001), par_metrics='accuracy', par_final_act='softmax', par_layer_multiplier=1)
-    critic = func_model5(input_shape=input_shape, output_num=1,
-                         par_loss='mse', par_opt=Adam(lr=0.005), par_metrics='accuracy', par_final_act='linear', par_layer_multiplier=1)
+    actor = model3(input_shape=input_shape, output_num=output_num,
+                   par_loss='categorical_crossentropy', par_opt=Adam(lr=0.001), par_metrics='accuracy', par_final_act='softmax')  # , par_layer_multiplier=1
+    critic = model3(input_shape=input_shape, output_num=1,
+                    par_loss='mse', par_opt=Adam(lr=0.005), par_metrics='accuracy', par_final_act='linear')  # , par_layer_multiplier=1
 
     # load players
     p1 = players.A2CAgent(actor, critic, param.DISCOUNT, enriched_features=True)
     p1.name = "A2C on training"
-    #p2 = players.Selfplay(p1)
-    #p2.name = "selfplay"
+    # p2 = players.Selfplay(p1)
+    # p2.name = "selfplay"
     p2 = players.Stick()
     p2.name = "sticky"
 
-    description = f"2nd test. x={param.MAX_INVALID_MOVES}. CORRECT tau on p1 and p2. Extra toprow. forced start of P2. fix lose bug. "
-    description += f"enr.feature={p1.enriched_features}"
+    description = f"x={param.MAX_INVALID_MOVES}. CORRECT tau on p1 and p2. Extra toprow. forced start of P2. fix lose bug. "
+    # description += f"enr.feature={p1.enriched_features}"
+    description = "kort"
 
     env.add_players(p1, p2)
     training = TrainAgent(env, parameters=param, debug_flag=True)
@@ -295,10 +298,10 @@ def batch_train():
 
     model_list.append(model2(input_shape=(6, 7, 1), output_num=7))
     """
-    #model_list.append(func_model5_duel1(input_shape=(6, 7, 1), output_num=7,
+    # model_list.append(func_model5_duel1(input_shape=(6, 7, 1), output_num=7,
     #                  par_loss='mse', par_opt=Adam(lr=0.001), par_metrics='accuracy', par_final_act='linear'))
 
-    #model_list.append(func_model_duel1b1(input_shape=(6, 7, 1), output_num=7,
+    # model_list.append(func_model_duel1b1(input_shape=(6, 7, 1), output_num=7,
     #                  par_loss='logcosh', par_opt=Adam(lr=0.001), par_metrics='accuracy', par_final_act='linear'))
     """
     model_list.append(func_model_duel1b1(input_shape=(6, 7, 1), output_num=7,
@@ -352,4 +355,12 @@ def batch_train():
 if __name__ == '__main__':
     #batch_train()
     #trainA2C()
+
+    #os.environ['CUDA_VISIBLE_DEVICES'] = '-1'
+
+    if tf.test.gpu_device_name():
+        print('GPU found')
+    else:
+        print("No GPU found")
+
     train_in_class()
