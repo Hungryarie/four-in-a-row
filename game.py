@@ -15,9 +15,9 @@ class FiarGame:
         self.columns = 7
         self._extra_toprows = 1  # extra rows at the top of the playingfield (can be used for feature engineering)
 
-        self.playingField = np.zeros([self.rows + self._extra_toprows, self.columns], dtype=int)
+        self.playingField = np.zeros([self.rows + self._extra_toprows, self.columns], dtype=float) # int
         self.playingField = self.playingField[:, :, np.newaxis]
-        self.featuremap = np.zeros([self.rows + self._extra_toprows, self.columns, 4], dtype=int)
+        self.featuremap = np.zeros([self.rows + self._extra_toprows, self.columns, 4], dtype=float) # int
 
         #self.reset()
 
@@ -25,7 +25,7 @@ class FiarGame:
         self.player1 = player1
         self.player1.color = "1"
         self.player1.player_id = 1
-        self.player1.value = 1
+        self.player1.value = 1.
 
         self.player2 = player2
         self.player2.color = "2"
@@ -109,7 +109,7 @@ class FiarGame:
         print(field[:, :, 2])
         print("\n> layer 3 = next move space")
         print(field[:, :, 3])
-        print("\n")
+        # print("\n")
 
     @property
     def active_player(self):
@@ -274,9 +274,9 @@ class FiarGame:
     def checkFourOnARow(x):
         # print(f"x:{x}")
         count = 0
-        same = 0
+        same = 0.
         win = False
-        winner = 0
+        winner = 0.
         for y in x:
             # print (y)
             if same == y and y != 0:
