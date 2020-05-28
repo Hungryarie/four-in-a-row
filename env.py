@@ -48,10 +48,10 @@ class environment(FiarGame):
         # self.observation_space_n = self.GetObservationSize()
         self.observation_max = self.player1.value  # equals 1
         self.observation_min = self.player2.value  # equals -1
-        #self.action_space = self.GetActionSpace()
-        #self.action_space_n = self.GetActionSize()
+        # self.action_space = self.GetActionSpace()
+        # self.action_space_n = self.GetActionSize()
 
-    def get_feature_size(self, enriched=False):
+    def get_feature_size(self, enriched=True):
         if enriched:
             return self.featuremap.shape
         else:
@@ -228,7 +228,7 @@ class environment(FiarGame):
                 # print(observation)
                 # print (f"reward: {reward}")
 
-                #self.print_feature_space()
+                # self.print_feature_space()
 
             if visualize_layers:
                 analyse_model.visual_debug_play(state=observation, turns=self.turns, print_num=True)
