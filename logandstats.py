@@ -13,7 +13,7 @@ class Stats:
         self.ep_rewards = []  # [-20]
         self.max_q_list = []
         self.epsilon = 1
-        self.tau = 0
+        self.tau = 1
         self.episode = 0
         self.episodes = []
         self.chosen_column = [[], [], []]
