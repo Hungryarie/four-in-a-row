@@ -21,11 +21,16 @@ from logandstats import Stats, ModelLog
 from train import TrainAgent
 from constants import TrainingParameters
 from model import load_a_model, model1, model1b, model1c, model1d, model2, model3, model4a, model4b, model5
-from model import func_model1, func_model_duel1b, func_model_duel1b1, func_model_duel1b2, func_model5, func_model5_duel1  # functional API specific
+# functional API specific
+from model import func_model1_small_conv, func_model1, func_model_duel1b, func_model_duel1b1, func_model_duel1b2, func_model2, func_model5, func_model5_duel1
 from analyse import AnalyseModel
 
 
 def train_in_class():
+    # For more repetitive results
+    random.seed(2)
+    np.random.seed(2)
+    tf.random.set_seed(2)
 
     # load training parameters
     param = TrainingParameters()
@@ -36,22 +41,23 @@ def train_in_class():
     # load models
     input_shape = env.get_feature_size(enriched=True)  # get environment shape
     output_num = input_shape[1]
-    actor = model3(input_shape=input_shape, output_num=output_num,
-                   par_loss='categorical_crossentropy', par_opt=Adam(lr=0.001), par_metrics='accuracy', par_final_act='softmax')  # , par_layer_multiplier=1
-    critic = model3(input_shape=input_shape, output_num=1,
-                    par_loss='mse', par_opt=Adam(lr=0.005), par_metrics='accuracy', par_final_act='linear')  # , par_layer_multiplier=1
+    actor = func_model1(input_shape=input_shape, output_num=output_num,
+                        par_loss='categorical_crossentropy', par_opt=Adam(lr=0.001, clipnorm=1.0, clipvalue=0.25), par_metrics='accuracy', par_final_act='softmax', par_layer_multiplier=1)  # , par_layer_multiplier=2
+    critic = func_model2(input_shape=input_shape, output_num=1,
+                         par_loss='mse', par_opt=Adam(lr=0.005, clipnorm=1.0, clipvalue=0.5), par_metrics='accuracy', par_final_act='linear', par_layer_multiplier=2)  # , par_layer_multiplier=1
 
     # load players
-    p1 = players.A2CAgent(actor, critic, param.DISCOUNT, enriched_features=True)
+    p1 = players.A2CAgent(actor, critic, param.DISCOUNT,
+                          enriched_features=True)
     p1.name = "A2C on training"
-    # p2 = players.Selfplay(p1)
-    # p2.name = "selfplay"
-    p2 = players.Stick()
-    p2.name = "sticky"
+    p2 = players.Selfplay(p1)
+    p2.name = "selfplay"
+    # p2 = players.Stick()
+    # p2.name = "sticky"
 
-    description = f"x={param.MAX_INVALID_MOVES}. CORRECT tau on p1 and p2. Extra toprow. forced start of P2. fix lose bug. "
+    description = f"faster TAU decay , p1=prob, p2=qvalues. ADVANTAge zero"
     # description += f"enr.feature={p1.enriched_features}"
-    description = "kort"
+    # description = "kort"
 
     env.add_players(p1, p2)
     training = TrainAgent(env, parameters=param, debug_flag=True)
@@ -161,7 +167,8 @@ def trainNN(p1_model=None, p2_model=None, log_flag=True, visualize_layers=False,
                     if len(env.player1.replay_memory) >= MIN_REPLAY_MEMORY_SIZE:
                         # get probability based action
                         tau = 1 - epsilon
-                        action_p1 = env.active_player.get_prob_action(state=env.playingField, actionspace=env.action_space, tau=tau)
+                        action_p1 = env.active_player.get_prob_action(
+                            state=env.playingField, actionspace=env.action_space, tau=tau)
                     else:
                         # Get random action
                         action_p1 = np.random.choice(env.action_space)
@@ -171,38 +178,48 @@ def trainNN(p1_model=None, p2_model=None, log_flag=True, visualize_layers=False,
 
                 if done:
                     # train one final time when winning the game
-                    env.player1.update_replay_memory((current_state, action_p1, reward_p1, new_state, done))
+                    env.player1.update_replay_memory(
+                        (current_state, action_p1, reward_p1, new_state, done))
                     env.player1.train(done, step)
 
                 if env._invalid_move_played:
                     count_stats.invalidmove_count += 1  # tensorboard stats
                     # train only when invalid move played
-                    env.player1.update_replay_memory((current_state, action_p1, reward_p1, new_state, done))
+                    env.player1.update_replay_memory(
+                        (current_state, action_p1, reward_p1, new_state, done))
                     env.player1.train(done, step)
                     step += 1
-                    logging.info(f" player1 caused the invalid move at action:{env._invalid_move_action}")
+                    logging.info(
+                        f" player1 caused the invalid move at action:{env._invalid_move_action}")
 
                 # current_state = new_state
                 # step += 1
             else:
                 # action_opponent = env.active_player.select_cell(board=env.playingField, state=env.GetState(), actionspace=env.action_space)
                 # selfplay
-                env.playingField = env.inactive_player.inverse_state(env.playingField)
-                action_opponent = env.active_player.select_cell(board=env.playingField, state=env.GetState(), actionspace=env.action_space)
-                env.playingField = env.inactive_player.inverse_state(env.playingField)
-                new_state, [_, reward_p1, _], done, _ = env.step(action_opponent)
+                env.playingField = env.inactive_player.inverse_state(
+                    env.playingField)
+                action_opponent = env.active_player.select_cell(
+                    board=env.playingField, state=env.GetState(), actionspace=env.action_space)
+                env.playingField = env.inactive_player.inverse_state(
+                    env.playingField)
+                new_state, [_, reward_p1, _], done, _ = env.step(
+                    action_opponent)
 
                 if not env._invalid_move_played:
                     # Every step after p2 played we update replay memory and train main network
-                    env.player1.update_replay_memory((current_state, action_p1, reward_p1, new_state, done))
+                    env.player1.update_replay_memory(
+                        (current_state, action_p1, reward_p1, new_state, done))
                     env.player1.train(done, step)
 
                     current_state = new_state
                     step += 1
                     if visualize_layers and len(env.player1.replay_memory) >= MIN_REPLAY_MEMORY_SIZE:
-                        analyse_model.visual_debug_train(state=current_state, turns=env.turns, save_to_file=False, print_num=True)
+                        analyse_model.visual_debug_train(
+                            state=current_state, turns=env.turns, save_to_file=False, print_num=True)
                 elif env._invalid_move_played:
-                    logging.info(f" player2 caused the invalid move at action:{env._invalid_move_action}")
+                    logging.info(
+                        f" player2 caused the invalid move at action:{env._invalid_move_action}")
 
             if not env._invalid_move_played:
                 env.setNextPlayer()
@@ -244,12 +261,14 @@ def trainNN(p1_model=None, p2_model=None, log_flag=True, visualize_layers=False,
             try:
                 suma = sum(env.player1.max_q_list)
                 lena = len(env.player1.max_q_list)
-                avg_max_q = sum(env.player1.max_q_list) / len(env.player1.max_q_list)
+                avg_max_q = sum(env.player1.max_q_list) / \
+                    len(env.player1.max_q_list)
             except ZeroDivisionError:
                 avg_max_q = 0
 
             try:
-                delta_q = sum(env.player1.delta_q_list) / len(env.player1.delta_q_list)
+                delta_q = sum(env.player1.delta_q_list) / \
+                    len(env.player1.delta_q_list)
             except ZeroDivisionError:
                 delta_q = 0
 
@@ -328,35 +347,36 @@ def batch_train():
                       par_loss='logcosh', par_opt=SGD(lr=0.001, momentum=0.9), par_metrics='accuracy', par_final_act='linear'))
     """
     model_list.append(func_model1(input_shape=(6, 7, 1), output_num=7,
-                      par_loss='logcosh', par_opt=SGD(lr=0.01, momentum=0.9), par_metrics='accuracy', par_final_act='linear'))
+                                  par_loss='logcosh', par_opt=SGD(lr=0.01, momentum=0.9), par_metrics='accuracy', par_final_act='linear'))
 
-    #model_list.append(func_model1(input_shape=(6, 7, 1), output_num=7,
+    # model_list.append(func_model1(input_shape=(6, 7, 1), output_num=7,
     #                  par_loss='categorical_crossentropy', par_opt=Adam(lr=0.001), clipnorm=1.0, clipvalue=0.5, par_metrics='accuracy', par_final_act='linear'))
-    #model_list.append(func_model1(input_shape=(6, 7, 1), output_num=7,
+    # model_list.append(func_model1(input_shape=(6, 7, 1), output_num=7,
     #                  par_loss='categorical_crossentropy', par_opt=Adam(lr=0.01), clipnorm=1.0, clipvalue=0.5, par_metrics='accuracy', par_final_act='linear'))
 
-    #model_list.append(model5(input_shape=(6, 7, 1), output_num=7,
+    # model_list.append(model5(input_shape=(6, 7, 1), output_num=7,
     #                  par_loss=model5.huber_loss(), par_opt=Adam(lr=0.001), par_metrics='accuracy'))
 
-    #model_list.append(func_model5(input_shape=(6, 7, 1), output_num=7,
+    # model_list.append(func_model5(input_shape=(6, 7, 1), output_num=7,
     #                  par_loss=func_model5.huber_loss(), par_opt=Adam(lr=0.001), par_metrics='accuracy'))
 
-    #model_list.append(func_model5_duel1(input_shape=(6, 7, 1), output_num=7,
+    # model_list.append(func_model5_duel1(input_shape=(6, 7, 1), output_num=7,
     #                  par_loss='mse', par_opt=Adam(lr=0.001), par_metrics='accuracy'))
 
-    #clipnorm=1.0, clipvalue=0.5
+    # clipnorm=1.0, clipvalue=0.5
 
     #model2 = load_a_model('models/func_model1_3xconv+2xdenseSMALL4x4(func)(mse^Adam^lr=0.001)_startstamp1569842535_episode7450__170.00max___66.60avg_-205.00min_1569845018.model')
     model2 = None
     for model in model_list:
-        trainNN(p1_model=model, p2_model=model2, visualize_layers=False, debug_flag=True)
+        trainNN(p1_model=model, p2_model=model2,
+                visualize_layers=False, debug_flag=True)
 
 
 if __name__ == '__main__':
-    #batch_train()
-    #trainA2C()
+    # batch_train()
+    # trainA2C()
 
-    #os.environ['CUDA_VISIBLE_DEVICES'] = '-1'
+    # os.environ['CUDA_VISIBLE_DEVICES'] = '-1'
 
     if tf.test.gpu_device_name():
         print('GPU found')
