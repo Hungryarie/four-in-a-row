@@ -263,6 +263,48 @@ class model1d(model_base):
         return model
 
 
+class func_model1_small_conv(model_base):
+    """
+    Good hyperparameters:
+    -
+
+    Medium hyperparameters:
+    -
+
+    Bad hyperparameters:
+    -
+    """
+    def __init__(self, **kwargs):
+        # defaults keyword arguments
+        kwargs['par_loss'] = kwargs.pop('par_loss', 'mse')
+        kwargs['par_opt'] = kwargs.pop('par_opt', Adam(lr=0.001))
+        kwargs['par_metrics'] = kwargs.pop('par_metrics', 'accuracy')
+        kwargs['par_final_act'] = kwargs.pop('par_final_act', 'softmax')
+
+        super().__init__(**kwargs)
+        self.model.model_name = '1xconv+2xdenseSMALL5x5(func)-HEnormal'
+        self.model.hyper_dict['model_name'] = self.model.model_name
+        self.append_hyperpar_to_name()
+
+    def create_model(self, input_shape, output_num):
+        multipl = self.layer_multiplier
+
+        # This returns a tensor
+        inputs = Input(shape=input_shape)
+
+        # a layer instance is callable on a tensor, and returns a tensor
+        x = Conv2D(128 * multipl, (5, 5), input_shape=input_shape, data_format="channels_last", padding='same', activation='relu', kernel_initializer='he_normal')(inputs)
+        x = Flatten()(x)
+        x = Dense(48 * multipl, activation='relu', kernel_initializer='he_normal')(x)
+        x = Dense(24 * multipl, activation='relu', kernel_initializer='he_normal')(x)
+        predictions = Dense(output_num, activation=self.fin_activation, kernel_initializer='he_normal')(x)
+
+        # This creates a model that includes
+        #  the Input layer and the stacked output layers
+        model = FuncModel(inputs=inputs, outputs=predictions)
+        return model
+
+
 class func_model1(model_base):
     """
     Good hyperparameters:
@@ -285,7 +327,7 @@ class func_model1(model_base):
         kwargs['par_final_act'] = kwargs.pop('par_final_act', 'softmax')
 
         super().__init__(**kwargs)
-        self.model.model_name = '3xconv+2xdenseSMALL4x4(func)-HEnormal'
+        self.model.model_name = '3xconv+1xdenseSMALL3x3(func)-HEnormal(TANH)'
         self.model.hyper_dict['model_name'] = self.model.model_name
         self.append_hyperpar_to_name()
 
@@ -296,12 +338,12 @@ class func_model1(model_base):
         inputs = Input(shape=input_shape)
 
         # a layer instance is callable on a tensor, and returns a tensor
-        x = Conv2D(12 * multipl, (4, 4), input_shape=input_shape, data_format="channels_last", padding='same', activation='relu', kernel_initializer='he_normal')(inputs)
-        x = Conv2D(24 * multipl, (4, 4), padding='same', activation='relu', kernel_initializer='he_normal')(x)
-        x = Conv2D(48 * multipl, (4, 4), padding='same', activation='relu', kernel_initializer='he_normal')(x)
+        x = Conv2D(12 * multipl, (3, 3), input_shape=input_shape, data_format="channels_last", padding='same', activation='tanh', kernel_initializer='he_normal')(inputs)
+        x = Conv2D(24 * multipl, (3, 3), padding='valid', activation='tanh', kernel_initializer='he_normal')(x)
+        x = Conv2D(48 * multipl, (3, 3), padding='valid', activation='tanh', kernel_initializer='he_normal')(x)
         x = Flatten()(x)
         x = Dense(48 * multipl, activation='relu', kernel_initializer='he_normal')(x)
-        x = Dense(32 * multipl, activation='relu', kernel_initializer='he_normal')(x)
+        # x = Dense(32 * multipl, activation='relu', kernel_initializer='he_normal')(x)
         predictions = Dense(output_num, activation=self.fin_activation, kernel_initializer='he_normal')(x)
 
         # This creates a model that includes
@@ -490,6 +532,48 @@ class model2(model_base):
 
         model.add(Dense(output_num, activation=self.fin_activation, kernel_initializer='he_normal'))
         # model.compile happens in baseclass method compile_model()
+        return model
+
+
+class func_model2(model_base):
+    """
+    Good hyperparameters:
+    -
+
+    Medium hyperparameters:
+    -
+
+    Bad hyperparameters:
+    -
+    """
+    def __init__(self, **kwargs):
+        # defaults keyword arguments
+        kwargs['par_loss'] = kwargs.pop('par_loss', 'mse')
+        kwargs['par_opt'] = kwargs.pop('par_opt', Adam(lr=0.001))
+        kwargs['par_metrics'] = kwargs.pop('par_metrics', 'accuracy')
+        kwargs['par_final_act'] = kwargs.pop('par_final_act', 'softmax')
+
+        super().__init__(**kwargs)
+        self.model.model_name = '1xdense(func)-HEnormal'
+        self.model.hyper_dict['model_name'] = self.model.model_name
+        self.append_hyperpar_to_name()
+
+    def create_model(self, input_shape, output_num):
+        multipl = self.layer_multiplier
+
+        # This returns a tensor
+        inputs = Input(shape=input_shape)
+
+        # a layer instance is callable on a tensor, and returns a tensor
+        # This returns a tensor
+        inputs = Input(shape=input_shape)
+        x = Flatten()(inputs)
+        x = Dense(24 * multipl, activation='relu', kernel_initializer='he_normal')(x)
+        predictions = Dense(output_num, activation=self.fin_activation, kernel_initializer='he_normal')(x)
+
+        # This creates a model that includes
+        #  the Input layer and the stacked output layers
+        model = FuncModel(inputs=inputs, outputs=predictions)
         return model
 
 
