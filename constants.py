@@ -16,16 +16,22 @@ class TrainingParameters():
 
         # Exploration settings
         self.EPSILON_DECAY = 0.99975 # 0.99900
+        self.TAU_DECAY = 0.99900
         self.MIN_EPSILON = 0.001 # 0.25 
 
         #  Stats settings
-        self.AGGREGATE_STATS_EVERY = 50  # episodes
+        self.AGGREGATE_STATS_EVERY = 10  # episodes
         self.SHOW_PREVIEW = True
 
         # Training reward setting
         self.reward_dict = {}
-        self.reward_dict['win'] = 100
-        self.reward_dict['lose'] = -100
-        self.reward_dict['tie'] = -99
-        self.reward_dict['invalid'] = -10
-        self.reward_dict['step'] = 0 # -0.5
+        #self.reward_dict['win'] = 100
+        #self.reward_dict['lose'] = -100
+        #self.reward_dict['tie'] = -99
+        #self.reward_dict['invalid'] = -10
+        #self.reward_dict['step'] = 0 # -0.5
+        self.reward_dict['win'] = 1.
+        self.reward_dict['lose'] = -1.
+        self.reward_dict['tie'] = -0.9
+        self.reward_dict['invalid'] = -0.03  #-0.1
+        self.reward_dict['step'] = -0.01  #-0.05
