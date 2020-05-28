@@ -114,12 +114,28 @@ class Player:
             action = np.random.choice(range(nb_actions), p=probs)
 
             self.set_policy_info(q_values)
-            self.print_probability_info(probs, action)
+            # self.print_probability_info(probs, action)
+
+            print(f"tau:{tau}")
+            for idx in range(nb_actions):
+                str_action = " "
+                if idx == np.argmax(probs):
+                    str_action = f"{str_action}--> prob. argmax:{idx} "
+                if action == idx:
+                    str_action = f"{str_action}--> chosen action:{idx}"
+
+                print(f"qs:{q_values[idx]:7.3f} -> "
+                      f"clipped:{clipped_val[idx]:7.3f} -> "
+                      f"exp:{exp[idx]:7.3f} -> "
+                      f"exp_values: {exp_values[idx]:7.3f} -> "
+                      f"probs:{probs[idx]:7.3f}"
+                      f"{str_action}")
 
         except RuntimeWarning:
+            logging.warning(f"runtime warning. chose random")
             action = np.random.choice(actionspace)
         except ValueError:
-            logging.warning(f"tau:{tau} resulted in INF probabilities")
+            logging.warning(f"tau:{tau} resulted in INF probabilities. chose random")
             action = np.random.choice(actionspace)
 
         return action
@@ -157,7 +173,7 @@ class Human(Player):
         return cell
 
     def get_prob_action(self, *args, **kwargs):
-        logging.error("Human class has no probability action")
+        logging.error("Human class has no probability action. Return random.")
         return np.random.choice(actionspace)
 
 
@@ -171,8 +187,9 @@ class Drunk(Player):
         return np.random.choice(actionspace)
 
     def get_prob_action(self, *args, **kwargs):
-        logging.error("Drunk class has no probability action")
-        return np.random.choice(actionspace)
+        logging.error("Drunk class has no probability action. Return random")
+        action = self.select_cell(*args, **kwargs)
+        return action
 
 
 class Stick(Player):
@@ -195,7 +212,7 @@ class Stick(Player):
         return self.column
 
     def get_prob_action(self, *args, **kwargs):
-        #logging.error("Stick class has no probability action")
+        # logging.error("Stick class has no probability action")
         action = self.select_cell(*args, **kwargs)
 
         return action
@@ -209,12 +226,12 @@ class Selfplay(Player):
         self.enriched_features = self.player.enriched_features
 
     def select_cell(self, state, actionspace, **kwargs):
-        #state[:, :, 0] = self.inverse_state(state[:, :, 0])  # inverse field
-        #if self.player.enriched_features:
+        # state[:, :, 0] = self.inverse_state(state[:, :, 0])  # inverse field
+        # if self.player.enriched_features:
         #    state[:, :, 1] = self.inverse_state(state[:, :, 1])  # inverse players turn aswell.
         action = self.player.select_cell(state, actionspace, **kwargs)
-        #state[:, :, 0] = self.inverse_state(state[:, :, 0])  # reverse field back to original game status
-        #if self.player.enriched_features:
+        # state[:, :, 0] = self.inverse_state(state[:, :, 0])  # reverse field back to original game status
+        # if self.player.enriched_features:
         #    state[:, :, 1] = self.inverse_state(state[:, :, 1])  # reverse players turn aswell.
 
         return action
@@ -229,9 +246,6 @@ class Selfplay(Player):
         return policy
 
 
-#from keras import Sequential
-#from keras.layers import Dense, Flatten
-#from keras.optimizers import Adam
 class A2CAgent(Player):
     def __init__(self, actor_model, critic_model, discount, *args, enriched_features=True):
         """
@@ -247,13 +261,10 @@ class A2CAgent(Player):
 
         # These are hyper parameters for the Policy Gradient
         self.discount_factor = discount  # 0.99
-        #self.actor_lr = 0.001
-        #self.critic_lr = 0.005
 
         # create model for policy network
         self.actor = actor_model.model      # self.build_actor()
         self.critic = critic_model.model    # self.build_critic()
-
 
         # get size of state and action
         self.value_size = self.critic.hyper_dict['output_num']  # self.critic.out_num
@@ -261,38 +272,6 @@ class A2CAgent(Player):
 
         # model metadata
         self.model = self.actor     # for usage in setup_for_training() - > needs proper fix!
-
-    # approximate policy and value using Neural Network
-    # actor: state is input and probability of each action is output of model
-    def build_actor(self):
-        raise DeprecationWarning
-        actor = Sequential()
-        actor.add(Dense(24, input_shape=(6, 7, self.channels), activation='relu',
-                        kernel_initializer='he_uniform'))
-        actor.add(Flatten())  # converts the 3D feature maps to 1D feature vectors
-        actor.add(Dense(self.action_size, activation='softmax',
-                        kernel_initializer='he_uniform'))
-        actor.summary()
-        # See note regarding crossentropy in cartpole_reinforce.py
-        actor.compile(loss='categorical_crossentropy',
-                      optimizer=Adam(lr=self.actor_lr),
-                      metrics=["accuracy"])
-        return actor
-
-    # critic: state is input and value of state is output of model
-    def build_critic(self):
-        raise DeprecationWarning
-        critic = Sequential()
-        critic.add(Flatten(input_shape=(6, 7, self.channels)))
-        critic.add(Dense(24, activation='relu',
-                         kernel_initializer='he_uniform'))
-        critic.add(Dense(self.value_size, activation='linear',
-                         kernel_initializer='he_uniform'))
-        critic.summary()
-        critic.compile(loss="mse",
-                       optimizer=Adam(lr=self.critic_lr),
-                       metrics=["accuracy"])
-        return critic
 
     # using the output of policy network, pick action stochastically
     def get_action(self, state, actionspace, **kwargs):
@@ -333,8 +312,8 @@ class A2CAgent(Player):
         next_state = next_state[np.newaxis, :, :]
 
         target = np.zeros((1, self.value_size))
-        #advantages = np.zeros((1, self.action_size))
-        advantages = self.actor.predict(state)
+        advantages = np.zeros((1, self.action_size))
+        # advantages = self.actor.predict(state)
 
         value = self.critic.predict(state)[0]
         next_value = self.critic.predict(next_state)[0]
