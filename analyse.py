@@ -1,7 +1,9 @@
 import numpy as np
 import matplotlib.pyplot as plt
-from matplotlib.ticker import (AutoMinorLocator, MultipleLocator)
+from matplotlib.ticker import (AutoLocator, AutoMinorLocator, MultipleLocator, LogLocator)
 import matplotlib.animation as animation
+from tensorflow.keras.models import load_model, Model as FuncModel
+import time
 
 
 class AnalyseModel:
@@ -16,16 +18,24 @@ class AnalyseModel:
 
         self.state_memory_list = []
 
-    def update_model(self, model, analyze_layers=[1, 2, 3]):
+    def update_model(self, model, analyze_layers=[1, 2, 3, 4, 5, 6]):
         """Updates the model with new weights (for instance during training) """
 
-        # layer_outputs = [layer.output for layer in model.layers[analyze_layers[0]:analyze_layers[1]]] # Extracts the outputs of the top x layers
-        layer_outputs = [model.layers[layer_num].output for layer_num in analyze_layers]               # Extracts the outputs of the top x layers
+        layer_outputs = [model.layers[layer_num].output for layer_num in analyze_layers if layer_num <= len(model.layers) - 1]               # Extracts the outputs of the top x layers
+
+        # remove flatten layer (if present)
+        for idx, layers in enumerate(layer_outputs):
+            if layers.name.startswith('flatten'):
+                del layer_outputs[idx]
+                break
+
+        # add final layer (if not present)
         final_layer = model.layers[len(model.layers) - 1]
-        layer_outputs.append(final_layer.output)
+        if final_layer.output.name != layer_outputs[-1].name:
+            layer_outputs.append(final_layer.output)
 
         self.activation_model = FuncModel(inputs=model.input, outputs=layer_outputs)  # Creates a model that will return these outputs, given the model input
-        self.activation_model.name = "analyze_activation_model"
+        self.activation_model.name2 = "analyze_activation_model"
 
         # get layernames
         self.activationlayer_names = []
@@ -51,10 +61,13 @@ class AnalyseModel:
         self.get_activations(state=state)
         self.render_state(state=state, turns=turns)
         self.numberfy_activations(state=state, print_num=print_num)
-        self.visualize_activations(state=state, turns=turns, save_to_file=save_to_file)
+        if save_to_file:
+            self.visualize_activations(state=state, turns=turns, save_to_file=save_to_file)
 
     def reset_figs(self):
         """resets the Pyplot Figures """
+
+        plt.close('all')
 
         self.plt = plt
         # setup for plotting
@@ -67,6 +80,7 @@ class AnalyseModel:
         self.activation_ims = []
 
     def render_state(self, state, turns):
+        "Renders and saves an image of the given state"
         plt.ioff()                          # turn off interactive plotting mode
         state2 = np.array(state[:, :, 0])
         # state -= state.mean()              # Post-processes the feature to make it visually palatable
@@ -80,7 +94,7 @@ class AnalyseModel:
 
         im = plt.imshow(state2, aspect='equal', cmap='autumn')
 
-        self.state_ims.append([im])
+        self.state_ims.append([im.copy()])
 
         self.save_img(plot=plt, turns=turns, prefix='state at turn')
 
@@ -136,11 +150,13 @@ class AnalyseModel:
     def visualize_activations(self, state, turns, save_to_file):
         IMAGES_PER_ROW = 10
         BORDER_WIDTH = 2    # must be even!
-
+        scale = 2.5   # default
+        size_h = 10  # default
+        size_w = 10  # default
         activations = self.activations  # get_activations(state)
         layer_names = self.activationlayer_names        # Names of the layers, so you can have them as part of your plot
 
-        self.state_memory_list.append(state)
+        self.state_memory_list.append(np.copy(state))
 
         display_grid = []
         non_conv_layers_amount = 0
@@ -187,8 +203,8 @@ class AnalyseModel:
             """
 
         # find max x&yshape
-        shape_x = []
-        shape_y = []
+        shape_x = [2]
+        shape_y = [2]
         for grid in display_grid:
             shape_x.append(grid.shape[1])
             shape_y.append(grid.shape[0])
@@ -209,14 +225,17 @@ class AnalyseModel:
         # append empty subplots to list
         for idx in range(len(activations)):
             plot_id = idx * COL + 1
-            ax = plt.subplot(len(activations), COL, plot_id)
-            axs_act.append(ax)
+            # ax = plt.subplot(len(activations), COL, plot_id)
+            # axs_act.append(ax)
+            axs_act.append(self.activation_fig.add_subplot(len(activations), COL, plot_id))
 
-            ax = plt.subplot(len(activations), COL, plot_id + 1)
-            axs_line.append(ax)
+            # ax = plt.subplot(len(activations), COL, plot_id + 1)
+            # axs_line.append(ax)
+            axs_line.append(self.activation_fig.add_subplot(len(activations), COL, plot_id + 1))
 
-            ax = plt.subplot(len(activations), COL, plot_id + 2)
-            axs_st.append(ax)
+            # ax = plt.subplot(len(activations), COL, plot_id + 2)
+            # axs_st.append(ax)
+            axs_st.append(self.activation_fig.add_subplot(len(activations), COL, plot_id + 2))
 
         ims = []
         # iterate over the subplots
@@ -224,7 +243,7 @@ class AnalyseModel:
         for idx, ax in enumerate(axs_act):
             try:
                 # ax.plot(x, y)
-                im = ax.imshow(display_grid[idx], aspect='equal', cmap='viridis')
+                im = ax.imshow(display_grid[idx], aspect='equal', cmap='seismic')  # cmap='viridis'
                 ims.append(im)
                 ax.set_title(f'{layer_names[idx]}')
 
@@ -249,7 +268,10 @@ class AnalyseModel:
         for idx, ax in enumerate(axs_line):
             # ax.plot(x, y)
             x = np.array(self.activation_mean_output[idx])
-            im, = ax.plot(x, label=turns)  # note the comma! Do no want a list, but an object. (otherwise can't create an animation)
+            if x.size > 1:
+                im, = ax.plot(x, label=turns)  # note the comma! Do no want a list, but an object. (otherwise can't create an animation)
+            else:
+                im, = ax.plot(x, label=turns, marker='o')
             ims.append(im)
             ax.set_title(f'{layer_names[idx]}')
 
@@ -257,16 +279,18 @@ class AnalyseModel:
             # ax.set_xlim(-1, max(self.n_features))
             MINIMUM_Y_LIM = 0.3
             y_lim = max(MINIMUM_Y_LIM, max(self.activation_mean_output[idx]))
-            ax.set_xlim(0, self.n_features[idx])
-            ax.set_ylim(0, y_lim)
+            ax.set_xlim(-1, self.n_features[idx] + 1)
+            ax.set_ylim(min(self.activation_mean_output[idx]) - 0.1, y_lim)
 
             # Change major ticks to show every #.
-            ax.xaxis.set_major_locator(MultipleLocator(5))
-            ax.yaxis.set_major_locator(MultipleLocator(y_lim / 5))
+            ax.xaxis.set_major_locator(MultipleLocator(1))
+            # ax.yaxis.set_major_locator(MultipleLocator(y_lim / 5))
+            ax.yaxis.set_major_locator(AutoLocator())
 
             # Change minor ticks to show every 1
             ax.xaxis.set_minor_locator(AutoMinorLocator(5))
-            ax.yaxis.set_minor_locator(AutoMinorLocator(y_lim / 5))
+            # ax.yaxis.set_minor_locator(AutoMinorLocator(y_lim / 5))
+            ax.yaxis.set_minor_locator(AutoMinorLocator())
             ax.legend()
             ax.grid(True)  # show gridlines
 
@@ -278,13 +302,13 @@ class AnalyseModel:
                 break
             state = self.state_memory_list[i]
             state2 = np.array(state[:, :, 0])
-            im = ax.imshow(state2, aspect='equal', cmap='autumn')
-            ims.append(im)
+            # print(state2)
+
             ax.set_title(f'state at turn {turns-idx}')
 
             # set x&y limits
-            ax.set_xlim(-1, size_w)
-            ax.set_ylim(size_h, -1)
+            ax.set_xlim(-1, 8)
+            ax.set_ylim(7, -1)
 
             # Change major ticks to show every x and y of the input array (creating borders).
             ax.xaxis.set_major_locator(MultipleLocator(size_w + BORDER_WIDTH))
@@ -295,6 +319,9 @@ class AnalyseModel:
             ax.yaxis.set_minor_locator(AutoMinorLocator(size_h + BORDER_WIDTH))
 
             ax.grid(False)  # show gridlines
+
+            im = ax.imshow(state2, aspect='equal', cmap='autumn')
+            ims.append(im)
             # break  # only show one plot
 
         # im = self.state_ims[len(self.state_ims)-1]
@@ -310,7 +337,7 @@ class AnalyseModel:
         self.activation_ims.append(ims)
 
     def save_img(self, plot, prefix, turns):
-        plot.savefig(f'output/{prefix}[{turns}].png')
+        plot.savefig(f'output/{time.time()}-{prefix}[{turns}].png')
 
     def render_vid(self):
 
