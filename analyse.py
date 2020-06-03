@@ -4,6 +4,7 @@ from matplotlib.ticker import (AutoLocator, AutoMinorLocator, MultipleLocator, L
 import matplotlib.animation as animation
 from tensorflow.keras.models import load_model, Model as FuncModel
 import time
+import os
 
 
 class AnalyseModel:
@@ -337,7 +338,9 @@ class AnalyseModel:
         self.activation_ims.append(ims)
 
     def save_img(self, plot, prefix, turns):
-        plot.savefig(f'output/{time.time()}-{prefix}[{turns}].png')
+        path = os.getcwd()
+        path = os.path.join(path, 'output', f'{time.time()}-{prefix}[{turns}].png')
+        plot.savefig(path)
 
     def render_vid(self):
 
