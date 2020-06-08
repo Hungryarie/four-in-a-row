@@ -78,6 +78,35 @@ class TrainAgent:
             self.analyse_model.update_model(self.env.player1.model)
             self.analyse_model.reset_figs()
 
+    def _preset_episode(self, start_id):
+        self.step_dict['start_state'] = [None, [], []]
+        self.step_dict['mid_state'] = [None, [], []]
+        self.step_dict['action'] = [None, [], []]
+        self.step_dict['reward'] = [None, [], []]
+        state = self.env.reset(start_id=start_id)
+        self.step_dict['mid_state'][self.env.inactive_player.player_id].append(state)
+
+        self.count_stats.episode_reward = 0
+
+        # Update tensorboard step every episode
+        self.env.player1.tensorboard.step = self.count_stats.episode
+
+    def _in_episode_stat_update(self):
+        # for stats
+        if self.env.active_player.player_id == 1:
+            self.env.player1.tensorboard.update_hist(p1_policyCentainty=self.env.player1.last_policy)
+            self.env.player1.tensorboard.update_hist(p1_probabilities=self.env.player1.last_probabilities)
+        else:
+            self.env.player1.tensorboard.update_hist(p2_policyCentainty=self.env.player2.last_policy)
+            self.env.player1.tensorboard.update_hist(p2_probabilities=self.env.player2.last_probabilities)
+
+        if self.env._invalid_move_played and self.env.current_player == 1:
+            self.count_stats.invalidmove_count += 1  # tensorboard stats
+
+        if self.env.prev_invalid_move_reset and self.env.current_player == 1:
+            # only collect the succesive invalidmove count
+            self.count_stats.invalidmove_count_succesive += self.env.prev_invalid_move_count
+
     def run_training(self, start_id=None):
         self.log.log_text_to_file(
             f"start training at: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n")
@@ -85,11 +114,9 @@ class TrainAgent:
         # Iterate over episodes
         for self.count_stats.episode in tqdm(range(1, self.para.EPISODES + 1), ascii=True, unit=' episodes'):
 
-            # Restarting episode - reset episode reward
-            state = self.env.reset(start_id=start_id)
-            self.step_dict['mid_state'][self.env.inactive_player.player_id].append(state)
+            # Restarting episode - preset / reset
+            self._preset_episode(start_id=start_id)
             done = False
-            self.count_stats.episode_reward = 0
 
             # check if training needs to proceed or if the model got corrupted
             if self.env.player1.got_NaNs:
@@ -99,23 +126,15 @@ class TrainAgent:
                     f"end training at: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n")
                 break  # Nan as model output. useless to continue training
 
-            # Update tensorboard step every episode
-            self.env.player1.tensorboard.step = self.count_stats.episode
-
             while not done:
 
                 self.env.block_invalid_moves(x=self.para.MAX_INVALID_MOVES)  # high number to being able to actualy train upon
 
-                # select action, train and get reward
-                reward_p1, reward_p2, done = self.action_and_train()
+                # select action, (train) and get reward
+                reward_p1, reward_p2, done = self.action_and_train(train_on_step=False)
 
-                # for stats
-                if self.env._invalid_move_played and self.env.current_player == 1:
-                    self.count_stats.invalidmove_count += 1  # tensorboard stats
-
-                if self.env.prev_invalid_move_reset and self.env.current_player == 1:
-                    # only collect the succesive invalidmove count
-                    self.count_stats.invalidmove_count_succesive += self.env.prev_invalid_move_count
+                # for tensorboard logging etc
+                self._in_episode_stat_update()
 
                 self.count_stats.episode_reward += reward_p1
 
@@ -134,13 +153,13 @@ class TrainAgent:
                     self.env.setNextPlayer()
 
             # episode is ended
-            # 2DO  TRAININGPART AFTER COMMIT
-
-            # reset for next round
-            self.step_dict['start_state'] = [None, [], []]
-            self.step_dict['mid_state'] = [None, [], []]
-            self.step_dict['action'] = [None, [], []]
-            self.step_dict['reward'] = [None, [], []]
+            # TRAININGPART
+            # self.visualize_state_action_rewards(self.step_dict['start_state'][1], self.step_dict['action'][1], self.step_dict['reward'][1])
+            # self.visualize_state_action_rewards(self.step_dict['start_state'][2], self.step_dict['action'][2], self.step_dict['reward'][2])
+            states_adj, actions_adj, rewards_adj = self.correct_states_actions_rewards(self.step_dict['start_state'][1],
+                                                                                       self.step_dict['action'][1],
+                                                                                       self.step_dict['reward'][1])
+            self.env.player1.train_model(states_adj, actions_adj, rewards_adj)
 
             if self.para.SHOW_PREVIEW and self.count_stats.episode % self.para.AGGREGATE_STATS_EVERY == 0:
                 # show winner info
@@ -176,9 +195,8 @@ class TrainAgent:
 
             # update tensorboard every x episode
             self.update_tensorboard(per_x_episode=self.para.AGGREGATE_STATS_EVERY)
-            # test histogram
-            self.env.player1.tensorboard.update_hist(policyCentainty=self.env.player1.last_policy)
-            self.env.player1.tensorboard.update_hist(p1_column=self.count_stats.chosen_column[1][1:], p2_column=self.count_stats.chosen_column[2][1:])
+            # update tensorboard histogrammen
+            self.env.player1.tensorboard.update_hist(p1_column=self.step_dict['action'][1], p2_column=self.step_dict['action'][2])
 
             # save an image every x episode
             self.save_img(per_x_episode=self.para.AGGREGATE_STATS_EVERY)
@@ -192,11 +210,11 @@ class TrainAgent:
                 self.count_stats.epsilon *= self.para.EPSILON_DECAY
                 self.count_stats.epsilon = max(self.para.MIN_EPSILON, self.count_stats.epsilon)
             # Decay tau
-            if self.count_stats.tau > self.para.MIN_EPSILON:
+            if self.count_stats.tau > self.para.MIN_TAU:
                 self.count_stats.tau *= self.para.TAU_DECAY
-                self.count_stats.tau = max(self.para.MIN_EPSILON, self.count_stats.tau)
+                self.count_stats.tau = max(self.para.MIN_TAU, self.count_stats.tau)
 
-    def action_and_train(self):
+    def action_and_train(self, train_on_step):
         """defenitions:\n
         start_state = state where the action is based upon => is the mid_state of the opponent
         mid_state = new state after the chosen action is played
@@ -205,12 +223,11 @@ class TrainAgent:
         # ACTION PART
 
         # get start state = mid state of opponent
-        # self.step_dict['start_state'][self.env.active_player.player_id] = np.copy(self.step_dict['mid_state'][self.env.inactive_player.player_id])
-
         self.step_dict['start_state'][self.env.active_player.player_id].append(np.copy(self.env.featuremap))
         state = self.step_dict['start_state'][self.env.active_player.player_id][-1]
         if self.debug:
-            self.env.print_feature_space(field=state)
+            pass
+            # self.env.print_feature_space(field=state)
 
         if self.env.active_player.player_id == 1:
             # use exploration for player 1
@@ -233,8 +250,6 @@ class TrainAgent:
 
         # log taken action
         self.step_dict['action'][self.env.active_player.player_id].append(action)
-        # add for logging/debugging purposes
-        self.count_stats.chosen_column[self.env.active_player.player_id].append(action)
 
         # log state after action
         self.step_dict['mid_state'][self.env.active_player.player_id].append(np.copy(next_state))
@@ -247,19 +262,19 @@ class TrainAgent:
         #  Training step is based on previous step. (because the new state is when the next player has made his move)
         if self.env._invalid_move_played:
             # train on invalid moves (current player)
-            # begin state
-            state = self.step_dict['start_state'][self.env.active_player.player_id][-1]
+            # begin = mid state
+            state = self.step_dict['mid_state'][self.env.active_player.player_id][-1]
             # action at begin state
             action = self.step_dict['action'][self.env.active_player.player_id][-1]
             if self.env.active_player.enriched_features and self.env._extra_toprows > 0:
                 # make a temporary invalid state, based on the current state + action (coin will be added to toprow)
-                # make a temporary invalid state to train with
                 next_state = self.env.make_invalid_state(action, state)
+                # replace log state after action
+                self.step_dict['mid_state'][self.env.active_player.player_id][-1] = np.copy(next_state)
             else:
                 # state after invalid move => is same as begin state
                 next_state = self.step_dict['mid_state'][self.env.active_player.player_id][-1]
             # reward after invalid move
-            # reward = reward_arr[self.env.active_player.player_id]
             reward = self.step_dict['reward'][self.env.active_player.player_id][-1]
 
             # print("\n----------\n")
@@ -268,9 +283,10 @@ class TrainAgent:
             # self.env.ShowField2(field=next_state)
             # print(f"\nreward:{reward}\n")
 
-            self.env.active_player.train_model(state, action, reward, next_state, done)  # train with these parameters
-            # self.env.player1.train_model(state, action, reward, next_state, done)  # train with these parameters
-        elif not done:
+            if train_on_step:
+                self.env.active_player.train_model(state, action, reward, next_state, done)  # train with these parameters
+                # self.env.player1.train_model(state, action, reward, next_state, done)  # train with these parameters
+        elif not done and train_on_step:
             # train on valid moves (from previous step)
             try:
                 # begin state
@@ -312,93 +328,107 @@ class TrainAgent:
                 # self.env.ShowField2(field=state)
                 # print(f"\naction:{action}\n")
                 # self.env.ShowField2(field=next_state)
-
                 self.env.inactive_player.train_model(state, action, reward, next_state, done)   # train with these parameters
                 # self.env.player1.train_model(state, action, reward, next_state, done)   # train with these parameters
 
-        # train one final time when done==true. Otherwise the final (most important! => win/lose) action is not being trained on.
+        # train one final time when done==true. Otherwise the final (most important! => win/lose) action is not being trained on / logged.
         if done:
             # add loosing reward to step_dict
             self.step_dict['reward'][self.env.inactive_player.player_id].append(reward_arr[self.env.inactive_player.player_id])
 
-            # self.env.ShowField2()
-            if self.debug:
-                self.env.render()
-                print(self.env.Winnerinfo())
+            if train_on_step:
+                # self.env.ShowField2()
+                if self.debug:
+                    self.env.render()
+                    print(self.env.Winnerinfo())
 
-            # (active player: winner)
-            # get state, action and reward for winner.
-            # begin state
-            state = self.step_dict['start_state'][self.env.active_player.player_id][-1]
-            # action at begin state
-            action = self.step_dict['action'][self.env.active_player.player_id][-1]
-            # state after winning move
-            next_state = self.step_dict['mid_state'][self.env.active_player.player_id][-1]
-            # reward after winning move
-            # reward = reward_arr[self.env.active_player.player_id]
-            reward = self.step_dict['reward'][self.env.active_player.player_id][-1]
+                # (active player: winner)
+                # get state, action and reward for winner.
+                # begin state
+                state = self.step_dict['start_state'][self.env.active_player.player_id][-1]
+                # action at begin state
+                action = self.step_dict['action'][self.env.active_player.player_id][-1]
+                # state after winning move
+                next_state = self.step_dict['mid_state'][self.env.active_player.player_id][-1]
+                # reward after winning move
+                # reward = reward_arr[self.env.active_player.player_id]
+                reward = self.step_dict['reward'][self.env.active_player.player_id][-1]
 
-            if self.debug:
-                print("\n----------\n")
-                print(f"ACTIVE PLAYER (DONE=true) (id:{self.env.active_player.player_id}, value:{self.env.active_player.value})")
-                # self.env.print_feature_space(field=state)
-                # print(f"action:{action}")
-                # self.env.print_feature_space(field=next_state)
-                # print("\n----------\n")
-                self.env.ShowField2(field=state)
-                print(f"action:{action}")
-                self.env.ShowField2(field=next_state)
-                print(f"reward:{reward}")
+                if self.debug:
+                    print("\n----------\n")
+                    print(f"ACTIVE PLAYER (DONE=true) (id:{self.env.active_player.player_id}, value:{self.env.active_player.value})")
+                    # self.env.print_feature_space(field=state)
+                    # print(f"action:{action}")
+                    # self.env.print_feature_space(field=next_state)
+                    # print("\n----------\n")
+                    self.env.ShowField2(field=state)
+                    print(f"action:{action}")
+                    self.env.ShowField2(field=next_state)
+                    print(f"reward:{reward}")
 
-            self.env.active_player.train_model(state, action, reward, next_state, done)
-            # self.env.player1.train_model(state, action, reward, next_state, done)   # train with these parameters
+                self.env.active_player.train_model(state, action, reward, next_state, done)
+                # self.env.player1.train_model(state, action, reward, next_state, done)   # train with these parameters
 
-            # (inactive player : loser)
-            # get state, action and reward for loser, because it is based on previous step it is always the losing step.
-            # begin state
-            state = self.step_dict['start_state'][self.env.inactive_player.player_id][-1]
-            # action at begin state
-            action = self.step_dict['action'][self.env.inactive_player.player_id][-1]
-            # state after opponents move
-            next_state = np.copy(
-                self.step_dict['mid_state'][self.env.active_player.player_id][-1])
-            # inverse players turn to simulate is is realy the next state and their turn.
-            next_state[:, :, 1] = self.env.active_player.inverse_state(
-                next_state[:, :, 1])
-            # reward after winning move
-            # reward = reward_arr[self.env.inactive_player.player_id]
-            reward = self.step_dict['reward'][self.env.inactive_player.player_id][-1]
+                # (inactive player : loser)
+                # get state, action and reward for loser, because it is based on previous step it is always the losing step.
+                # begin state
+                state = self.step_dict['start_state'][self.env.inactive_player.player_id][-1]
+                # action at begin state
+                action = self.step_dict['action'][self.env.inactive_player.player_id][-1]
+                # state after opponents move
+                next_state = np.copy(
+                    self.step_dict['mid_state'][self.env.active_player.player_id][-1])
+                # inverse players turn to simulate is is realy the next state and their turn.
+                next_state[:, :, 1] = self.env.active_player.inverse_state(
+                    next_state[:, :, 1])
+                # reward after winning move
+                # reward = reward_arr[self.env.inactive_player.player_id]
+                reward = self.step_dict['reward'][self.env.inactive_player.player_id][-1]
 
-            if self.debug:
-                print("\n----------\n")
-                print(f"INACTIVE PLAYER (DONE=true) (id:{self.env.inactive_player.player_id}, value:{self.env.inactive_player.value})\n")
-                # self.env.print_feature_space(field=state)
-                # print(f"action:{action}")
-                # self.env.print_feature_space(field=next_state)
-                # print("\n----------\n")
-                self.env.ShowField2(field=state)
-                print(f"action:{action}")
-                self.env.ShowField2(field=next_state)
-                print(f"reward:{reward}")
+                if self.debug:
+                    print("\n----------\n")
+                    print(f"INACTIVE PLAYER (DONE=true) (id:{self.env.inactive_player.player_id}, value:{self.env.inactive_player.value})\n")
+                    # self.env.print_feature_space(field=state)
+                    # print(f"action:{action}")
+                    # self.env.print_feature_space(field=next_state)
+                    # print("\n----------\n")
+                    self.env.ShowField2(field=state)
+                    print(f"action:{action}")
+                    self.env.ShowField2(field=next_state)
+                    print(f"reward:{reward}")
 
-            self.env.inactive_player.train_model(state, action, reward, next_state, done)
-            # self.env.player1.train_model(state, action, reward, next_state, done)   # train with these parameters
+                self.env.inactive_player.train_model(state, action, reward, next_state, done)
+                # self.env.player1.train_model(state, action, reward, next_state, done)   # train with these parameters
 
-        """
-        print(reward_arr)
-        if done and self.env.current_player == 2:
-            print("player 2 won")
-            print(f"reward : {reward}")
-            print(f"reward p1 : {reward_p1}")
-            print(f"reward p2 : {reward_p2}")
-
-        if done and self.env.current_player == 1:
-            print("player 1 won")
-            print(f"reward : {reward}")
-            print(f"reward p1 : {reward_p1}")
-            print(f"reward p2 : {reward_p2}")
-        """
         return reward_p1, reward_p2, done
+
+    def visualize_state_action_rewards(self, states, actions, rewards):
+
+        states_adj, actions_adj, rewards_adj = self.correct_states_actions_rewards(states, actions, rewards)
+
+        print(f'HISTORY of player: {states[0][0,0,1]}')
+        for idx, (state, action, reward) in enumerate(zip(states_adj, actions_adj, rewards_adj)):
+            print("\n----------")
+            print(f"begin state step:{idx}")
+            self.env.ShowField2(field=state)
+            print(f"new action:{action}")
+            print(f"gives reward:{reward}")
+
+        print("end of episode")
+
+    def correct_states_actions_rewards(self, states, actions, rewards):
+        """correct the index of the gathered states, actions and rewards."""
+        min_len = min(len(states), len(actions), len(rewards))
+
+        states = states[-min_len:]
+        actions = actions[-min_len:]
+        if rewards[-1] == self.para.reward_dict['lose']:
+            rewards_adj = rewards[-(min_len + 1):-2]
+            rewards_adj.append(rewards[-1])
+        else:
+            rewards_adj = rewards[-min_len:]
+
+        return states, actions, rewards_adj
 
     def update_tensorboard(self, per_x_episode):
         if self.count_stats.episode % per_x_episode == 0:
@@ -456,7 +486,7 @@ class TrainAgent:
     def save_img(self, per_x_episode):
         if self.count_stats.episode % per_x_episode == 0:
             plt.figure(figsize=(30, 20))
-            plt.ylim(-300, 150)
+            plt.ylim(4 * self.para.reward_dict['lose'], 2 * self.para.reward_dict['win'])
 
             ep = self.count_stats.episodes[-min(per_x_episode,
                                                 len(self.count_stats.episodes)):]
