@@ -32,6 +32,7 @@ class Player:
 
         self.enriched_features = False
 
+        # self.last_policy = np.zeros(7)
         self.last_argmax = 0
         self.count_argmax_shift = 0
         self.policy_counter = 0
@@ -114,6 +115,8 @@ class Player:
             action = np.random.choice(range(nb_actions), p=probs)
 
             self.set_policy_info(q_values)
+            self.set_probability_info(probs)
+            self.set_argmax_info(q_values)
             # self.print_probability_info(probs, action)
 
             print(f"tau:{tau}")
@@ -144,6 +147,10 @@ class Player:
         self.last_policy = policy
         self.certainty_indicator = max(policy) - min(policy)
 
+    def set_probability_info(self, probabilities):
+        self.last_probabilities = probabilities
+
+    def set_argmax_info(self, policy):
         self.prev_argmax = self.last_argmax
         self.last_argmax = np.argmax(policy)
         self.policy_counter += 1
@@ -198,7 +205,13 @@ class Stick(Player):
     """
     def __init__(self):
         super().__init__()
-        self.column = np.random.choice([0, 1, 2, 3, 4, 5, 6])
+        self.reset_column()
+
+    def reset_column(self, actionspace=[0, 1, 2, 3, 4, 5, 6]):
+        self.column = np.random.choice(actionspace)
+        self.last_policy = np.zeros(7)
+        self.last_policy[self.column] = 1
+        self.last_probabilities = np.copy(self.last_policy)
 
     def preprocess(self, state, actionspace, **kwargs):
         pass
@@ -207,14 +220,12 @@ class Stick(Player):
         # return random.randint(0,np.size(board,1)-1)
         # return random.randint(min(actionspace), max(actionspace))
         if self.column not in actionspace:
-            self.column = np.random.choice(actionspace)
-
+            self.reset_column(actionspace)
         return self.column
 
     def get_prob_action(self, *args, **kwargs):
         # logging.error("Stick class has no probability action")
         action = self.select_cell(*args, **kwargs)
-
         return action
 
 
@@ -229,6 +240,8 @@ class Selfplay(Player):
         # state[:, :, 0] = self.inverse_state(state[:, :, 0])  # inverse field
         # if self.player.enriched_features:
         #    state[:, :, 1] = self.inverse_state(state[:, :, 1])  # inverse players turn aswell.
+        self.last_policy = np.copy(self.get_qs(state))       # for logging purposes (tensorboard)
+        self.last_probabilities = self.last_policy           # for logging purposes (tensorboard)
         action = self.player.select_cell(state, actionspace, **kwargs)
         # state[:, :, 0] = self.inverse_state(state[:, :, 0])  # reverse field back to original game status
         # if self.player.enriched_features:
@@ -298,6 +311,10 @@ class A2CAgent(Player):
         # state = state[np.newaxis, :, :]  # add one dimention in order to work (6,7,4) => (1,6,7,4)
 
         qs = self.get_qs(state)
+
+        self.last_policy = qs           # for logging purposes (tensorboard)
+        self.last_probabilities = qs    # for logging purposes (tensorboard)
+
         # overrule model probabilties according to the (modified) actionspace
         for key, prob in enumerate(qs):
             if key not in actionspace:
@@ -305,8 +322,17 @@ class A2CAgent(Player):
         action = np.argmax(qs)
         return action
 
+    def discounted_rewards(self, rewards):
+        """ Compute the discounted rewards over an episode
+        """
+        discounted_r, cumul_r = np.zeros_like(rewards), 0
+        for t in reversed(range(0, len(rewards))):
+            cumul_r = rewards[t] + cumul_r * self.discount_factor
+            discounted_r[t] = cumul_r
+        return discounted_r
+
     # update policy network every episode
-    def train_model(self, state, action, reward, next_state, done):
+    def train_model_old(self, state, action, reward, next_state, done):
         # add one dimention in order to work (6,7,4) => (1,6,7,4)
         state = state[np.newaxis, :, :]
         next_state = next_state[np.newaxis, :, :]
@@ -327,6 +353,25 @@ class A2CAgent(Player):
 
         self.actor.fit(state, advantages, epochs=1, verbose=0, callbacks=[self.tensorboard] if done else None)
         self.critic.fit(state, target, epochs=1, verbose=0, callbacks=[self.tensorboard] if done else None)
+
+    # update policy network every episode
+    def train_model(self, states, actions, rewards):
+        """ Update actor and critic networks from experience
+        """
+        # Compute discounted rewards and Advantage (TD. Error)
+        discounted_rewards = self.discounted_rewards(rewards)
+        states = np.array(states)
+        state_values = self.critic.predict(states)
+        advantages = discounted_rewards - np.reshape(state_values, len(state_values))
+        advantages_onehot = np.zeros((len(state_values), self.action_size))
+        for idx, adv in enumerate(advantages_onehot):
+            action = actions[idx]
+            adv[action] = advantages[idx]
+
+        # Networks optimization
+        self.actor.fit(states, advantages_onehot, epochs=1, verbose=0, callbacks=[self.tensorboard])
+        self.critic.fit(states, discounted_rewards, epochs=1, verbose=0, callbacks=[self.tensorboard])
+        pass
 
 
 class DDQNPlayer(Player):
