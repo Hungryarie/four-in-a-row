@@ -4,6 +4,8 @@ import time
 import numpy as np
 
 from datetime import datetime
+import tensorflow as tf
+from tensorflow.keras.utils import plot_model
 
 
 class Stats:
@@ -199,3 +201,17 @@ class ModelLog():
             for i in range(1, 3):
                 parameter_writer.writerow([self.timestamp, self.timenow, i, self.get_info(i, "player_class"), self.get_info(i, "player_name"), self.get_info(i, "model_class"), self.get_info(i, "model_name"), self.get_info(i, "model_loss"), self.get_info(i, "model_opt_name"), self.get_info(i, "model_lr"), self.get_info(i, "model_timestamp"), self.get_info(i, "model_fullname"), self.get_info(i, "model_used_path")])
         parameters_file.close()
+
+    def plot_model(self, model):
+        path = f"models/modelplots/{self.timestamp}-{model.model_class}.png"
+        model._layers = [layer for layer in model._layers if not isinstance(layer, dict)]  # workaround for bug: https://github.com/tensorflow/tensorflow/issues/38988
+        model._layers = [layer for layer in model._layers if isinstance(layer, tf.keras.layers.Layer)]
+        plot_model(model, path, show_shapes=True)
+        self.log_text_to_file(f"stored model plot:{path}")
+
+    def print_model_summary(self, model):
+        stringlist = []
+        model.summary(print_fn=lambda x: stringlist.append(x))
+        short_model_summary = "\n".join(stringlist)
+        self.log_text_to_file("Model summary:")
+        self.log_text_to_file(short_model_summary)
