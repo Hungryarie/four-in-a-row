@@ -54,8 +54,11 @@ class TrainAgent:
         # self.log.add_player_info_old(self.env.player1, self.env.player2)
         self.log.add_player_info(self.env.player1)
         self.log.add_player_info(self.env.player2)
-        self.log.add_modelinfo(1, self.env.player1.actor, "actor")
-        self.log.add_modelinfo(1, self.env.player1.critic, "critic")
+        if self.env.player1.actor is not None:
+            self.log.add_modelinfo(1, self.env.player1.actor, "actor")
+            self.log.add_modelinfo(1, self.env.player1.critic, "critic")
+        if self.env.player1.twohead is not None:
+            self.log.add_modelinfo(1, self.env.player1.twohead, "twohead")
         self.log.add_constants(self.para)
         self.log.write_to_csv()
         self.log.write_parameters_to_file()
@@ -90,6 +93,34 @@ class TrainAgent:
 
         # Update tensorboard step every episode
         self.env.player1.tensorboard.step = self.count_stats.episode
+
+    def _episode_review(self, per_x_episode, done=False):
+        """analyse and render every x episodes"""
+        if not self.env._invalid_move_played and self.para.SHOW_PREVIEW and self.count_stats.episode % per_x_episode == 0:
+            self.env.render()
+            print('\n')
+            if done:
+                print(self.env.Winnerinfo())                        # show winner info
+                self.print_reward(self.count_stats.episode,
+                                  self.count_stats.episode_reward)  # print episode reward
+                save_to_file = True
+            else:
+                save_to_file = False
+
+            if self.debug:
+                # analyse model graphically
+                self.analyse_model.update_model(self.env.player1.model)
+                self.analyse_model.visual_debug_train(state=self.env.featuremap, turns=self.env.turns,
+                                                      save_to_file=save_to_file, print_num=False,
+                                                      prefix=f'actor @ episode {self.count_stats.episode}')
+                if done:
+                    if self.env.player1.critic is not None:
+                        self.analyse_model.reset_figs()
+                        self.analyse_model.update_model(self.env.player1.critic)
+                        self.analyse_model.visual_debug_train(state=self.env.featuremap, turns=self.env.turns,
+                                                              save_to_file=True, print_num=False,
+                                                              prefix=f'critic @ episode {self.count_stats.episode}')
+                    self.analyse_model.reset_figs()
 
     def _in_episode_stat_update(self):
         # for stats
@@ -130,23 +161,15 @@ class TrainAgent:
 
                 self.env.block_invalid_moves(x=self.para.MAX_INVALID_MOVES)  # high number to being able to actualy train upon
 
-                # select action, (train) and get reward
+                # select action, step, get reward (and train)
                 reward_p1, reward_p2, done = self.action_and_train(train_on_step=False)
 
                 # for tensorboard logging etc
                 self._in_episode_stat_update()
-
                 self.count_stats.episode_reward += reward_p1
 
-                # render every x episodes
-                if not self.env._invalid_move_played and self.para.SHOW_PREVIEW and self.count_stats.episode % self.para.AGGREGATE_STATS_EVERY == 0:
-                    self.env.render()
-                    print('\n')
-
-                if not self.env._invalid_move_played and self.debug:
-                    self.analyse_model.update_model(self.env.player1.model)
-                    self.analyse_model.visual_debug_train(state=self.env.featuremap, turns=self.env.turns,
-                                                          save_to_file=False, print_num=False)
+                # analyse and render every x episodes
+                self._episode_review(per_x_episode=self.para.AGGREGATE_STATS_EVERY)
 
                 # change player after a valid move
                 if not self.env._invalid_move_played and not done:
@@ -161,31 +184,8 @@ class TrainAgent:
                                                                                        self.step_dict['reward'][1])
             self.env.player1.train_model(states_adj, actions_adj, rewards_adj)
 
-            if self.para.SHOW_PREVIEW and self.count_stats.episode % self.para.AGGREGATE_STATS_EVERY == 0:
-                # show winner info
-                print(self.env.Winnerinfo())
-                # print episode reward
-                self.print_reward(self.count_stats.episode,
-                                  self.count_stats.episode_reward)
-
-            if self.debug:
-                self.analyse_model.visual_debug_train(state=self.env.featuremap, turns=self.env.turns,
-                                                      save_to_file=True, print_num=False,
-                                                      prefix=f'actor @ episode {self.count_stats.episode}')
-                # self.analyse_model.update_model(self.env.player1.model)
-                self.analyse_model.reset_figs()
-
-                self.analyse_model.update_model(self.env.player1.critic)
-                self.analyse_model.visual_debug_train(state=self.env.featuremap, turns=self.env.turns,
-                                                      save_to_file=True, print_num=False,
-                                                      prefix=f'critic @ episode {self.count_stats.episode}')
-                self.analyse_model.reset_figs()
-                # self.env.render()
-
-            if self.debug and self.count_stats.episode % self.para.AGGREGATE_STATS_EVERY == 0:
-                self.analyse_model.visual_debug_train(state=self.env.featuremap, turns=self.env.turns,
-                                                      print_num=False, save_to_file=True,
-                                                      prefix=f'final @ episode {self.count_stats.episode}')
+            # analyse / review every x episodes
+            self._episode_review(per_x_episode=self.para.AGGREGATE_STATS_EVERY, done=True)
 
             # collect stats for tensorboard after every episode
             self.collect_stats()
@@ -444,6 +444,7 @@ class TrainAgent:
                                                       count_dia_right=self.count_stats.count_dia_right, reward_std=self.count_stats.std_reward,
                                                       tau=self.count_stats.tau)
 
+            self.env.player1.tensorboard.update_hist(rewards=self.count_stats.ep_rewards)
             # reset stats
             self.count_stats.reset_stats()
 
@@ -474,14 +475,19 @@ class TrainAgent:
 
     def save_model(self, player):
         timestamp = player.model.timestamp
-        actor_model_name = f'models/A2C/{timestamp}-{int(time.time())}_ep{self.count_stats.episode}_actor.model'
-        critic_model_name = f'models/A2C/{timestamp}-{int(time.time())}_ep{self.count_stats.episode}_critic.model'
+        if player.actor is not None:
+            actor_model_name = f'models/A2C/{timestamp}-{int(time.time())}_ep{self.count_stats.episode}_actor.model'
+            critic_model_name = f'models/A2C/{timestamp}-{int(time.time())}_ep{self.count_stats.episode}_critic.model'
 
-        actor_path = os.path.normpath(os.path.join(os.getcwd(), actor_model_name))
-        critic_path = os.path.normpath(os.path.join(os.getcwd(), critic_model_name))
+            actor_path = os.path.normpath(os.path.join(os.getcwd(), actor_model_name))
+            critic_path = os.path.normpath(os.path.join(os.getcwd(), critic_model_name))
 
-        player.actor.save(actor_path)
-        player.critic.save(critic_path)
+            player.actor.save(actor_path)
+            player.critic.save(critic_path)
+        elif player.twohead is not None:
+            twohead_model_name = f'models/A2C/{timestamp}-{int(time.time())}_ep{self.count_stats.episode}_twohead.model'
+            twohead_path = os.path.normpath(os.path.join(os.getcwd(), twohead_model_name))
+            player.twohead.save(twohead_path)
 
     def save_img(self, per_x_episode):
         if self.count_stats.episode % per_x_episode == 0:
