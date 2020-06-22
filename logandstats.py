@@ -16,11 +16,9 @@ class Stats:
         self.tau = 1
         self.episode = 0
         self.episodes = []
-        self.chosen_column = [[], [], []]
 
     def reset_stats(self):
         """Reset stats"""
-
         self.win_ratio = 0
         self.win_count = 0
         self.loose_count = 0
@@ -32,7 +30,6 @@ class Stats:
         self.count_vertical = 0
         self.count_dia_right = 0
         self.count_dia_left = 0
-        self.chosen_column = [[], [], []]
 
     def aggregate_stats(self, calc_steps):
         try:
@@ -90,65 +87,6 @@ class ModelLog():
         dic.update(model.hyper_dict)  # extent dic with model hyper dictionary (eg. name, class, timestamp, optimizer name, learning rate, final activation layertype etc.)
         dic['model_fullname'] = f'{dic["model_class"]}_{dic["model_name"]}_startstamp{dic["timestamp"]}'
         self.model_dict.append(dic)
-
-    def add_player_info_old(self, p1, p2):
-        raise DeprecationWarning("use add_player_info instead")
-        self.player1_class = p1.player_class
-        self.player2_class = p2.player_class
-
-        self.player1_name = p1.name
-        self.player2_name = p2.name
-
-        try:
-            self.model1_name = p1.model.model_name
-            self.model1_class = p1.model.model_class
-            self.model1_timestamp = p1.model.timestamp
-            self.model1_fullname = f'{self.model1_class}_{self.model1_name}_startstamp{self.model1_timestamp}'
-            self.model1_opt_name = p1.model.optimizer_name
-            self.model1_lr = p1.model._lr
-            self.model1_loss = p1.model.loss
-            self.model1_acc = p1.model.metrics
-            self.model1_fin_activation = p1.model.fin_activation
-        except AttributeError:
-            self.model1_name = 'n/a'
-            self.model1_class = 'n/a'
-            self.model1_timestamp = 'n/a'
-            self.model1_fullname = 'n/a'
-            self.model1_opt_name = 'n/a'
-            self.model1_lr = 'n/a'
-            self.model1_loss = 'n/a'
-            self.model1_acc = 'n/a'
-            self.model1_fin_activation = 'n/a'
-
-        try:
-            self.model2_name = p2.model.model_name
-            self.model2_class = p2.model.model_class
-            self.model2_timestamp = p2.model.timestamp
-            self.model2_fullname = f'{self.model2_class}_{self.model2_name}_startstamp{self.model2_timestamp}'
-            self.model2_opt_name = p2.model.optimizer_name
-            self.model2_lr = p2.model._lr
-            self.model2_loss = p2.model.loss
-            self.model2_acc = p2.model.metrics
-            self.model2_fin_activation = p2.model.fin_activation
-        except AttributeError:
-            self.model2_name = 'n/a'
-            self.model2_class = 'n/a'
-            self.model2_timestamp = 'n/a'
-            self.model2_fullname = 'n/a'
-            self.model2_opt_name = 'n/a'
-            self.model2_lr = 'n/a'
-            self.model2_loss = 'n/a'
-            self.model2_acc = 'n/a'
-            self.model2_fin_activation = 'n/a'
-
-        try:
-            self.model1_used_path = p1.model.model_used_path
-        except AttributeError:
-            self.model1_used_path = 'n/a'
-        try:
-            self.model2_used_path = p2.model.model_used_path
-        except AttributeError:
-            self.model2_used_path = 'n/a'
 
     def add_constants(self, parameters):
         """add the constants parameters object to self.constants\n\n
