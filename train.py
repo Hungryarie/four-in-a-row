@@ -62,6 +62,8 @@ class TrainAgent:
         self.log.add_constants(self.para)
         self.log.write_to_csv()
         self.log.write_parameters_to_file()
+        self.log.plot_model(self.env.player1.model)
+        self.log.print_model_summary(self.env.player1.model)
 
         self.count_stats = Stats()  # set new counter class
 
