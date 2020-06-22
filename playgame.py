@@ -23,6 +23,7 @@ from constants import TrainingParameters
 from model import load_a_model, model1, model1b, model1c, model1d, model2, model3, model4a, model4b, model5
 # functional API specific
 from model import func_model1_small_conv, func_model1, func_model_duel1b, func_model_duel1b1, func_model_duel1b2, func_model2, func_model5, func_model5_duel1
+from model import ACmodel1
 from analyse import AnalyseModel
 
 
@@ -41,21 +42,25 @@ def train_in_class():
     # load models
     input_shape = env.get_feature_size(enriched=True)  # get environment shape
     output_num = input_shape[1]
-    actor = func_model1(input_shape=input_shape, output_num=output_num,
-                        par_loss='categorical_crossentropy', par_opt=Adam(lr=0.001, clipnorm=1.0, clipvalue=0.25), par_metrics='accuracy', par_final_act='softmax', par_layer_multiplier=1)  # , par_layer_multiplier=2
-    critic = func_model2(input_shape=input_shape, output_num=1,
-                         par_loss='mse', par_opt=Adam(lr=0.005, clipnorm=1.0, clipvalue=0.5), par_metrics='accuracy', par_final_act='linear', par_layer_multiplier=2)  # , par_layer_multiplier=1
+    #actor = func_model1(input_shape=input_shape, output_num=output_num,
+    #                    par_loss='categorical_crossentropy', par_opt=Adam(lr=0.001, clipnorm=1.0, clipvalue=0.25), par_metrics='accuracy', par_final_act='softmax', par_layer_multiplier=1)  # , par_layer_multiplier=2
+    #critic = func_model2(input_shape=input_shape, output_num=1,
+    #                     par_loss='mse', par_opt=Adam(lr=0.005, clipnorm=1.0, clipvalue=0.5), par_metrics='accuracy', par_final_act='linear', par_layer_multiplier=2)  # , par_layer_multiplier=1
+    acmodel = ACmodel1(input_shape=input_shape, output_num=output_num,
+                       par_loss='categorical_crossentropy', par_opt=Adam(lr=0.001, clipnorm=1.0, clipvalue=0.25), par_metrics='accuracy', par_final_act='softmax', par_layer_multiplier=1)
 
     # load players
-    p1 = players.A2CAgent(actor, critic, param.DISCOUNT,
+    #p1 = players.A2CAgent(actor_model=actor, critic_model=critic, discount=param.DISCOUNT,
+    #                      enriched_features=True)
+    p1 = players.A2CAgent(actor_model=None, critic_model=None, twohead_model=acmodel, discount=param.DISCOUNT,
                           enriched_features=True)
     p1.name = "A2C on training"
-    p2 = players.Selfplay(p1)
-    p2.name = "selfplay"
-    # p2 = players.Stick()
-    # p2.name = "sticky"
+    #p2 = players.Selfplay(p1)
+    #p2.name = "selfplay"
+    p2 = players.Stick()
+    p2.name = "sticky"
 
-    description = f"faster TAU decay , p1=prob, p2=qvalues. ADVANTAge zero"
+    description = f"twoheaded network"
     # description += f"enr.feature={p1.enriched_features}"
     # description = "kort"
 
@@ -365,7 +370,7 @@ def batch_train():
 
     # clipnorm=1.0, clipvalue=0.5
 
-    #model2 = load_a_model('models/func_model1_3xconv+2xdenseSMALL4x4(func)(mse^Adam^lr=0.001)_startstamp1569842535_episode7450__170.00max___66.60avg_-205.00min_1569845018.model')
+    # model2 = load_a_model('models/func_model1_3xconv+2xdenseSMALL4x4(func)(mse^Adam^lr=0.001)_startstamp1569842535_episode7450__170.00max___66.60avg_-205.00min_1569845018.model')
     model2 = None
     for model in model_list:
         trainNN(p1_model=model, p2_model=model2,
