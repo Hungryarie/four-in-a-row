@@ -47,7 +47,7 @@ def train_in_class():
     #critic = func_model2(input_shape=input_shape, output_num=1,
     #                     par_loss='mse', par_opt=Adam(lr=0.005, clipnorm=1.0, clipvalue=0.5), par_metrics='accuracy', par_final_act='linear', par_layer_multiplier=2)  # , par_layer_multiplier=1
     acmodel = ACmodel1(input_shape=input_shape, output_num=output_num,
-                       par_loss='categorical_crossentropy', par_opt=Adam(lr=0.001, clipnorm=1.0, clipvalue=0.25), par_metrics='accuracy', par_final_act='softmax', par_layer_multiplier=1)
+                       par_loss=['categorical_crossentropy', 'mse'], par_opt=Adam(lr=0.001, clipnorm=1.0, clipvalue=0.25), par_metrics='accuracy', par_final_act='softmax', par_layer_multiplier=1)
 
     # load players
     #p1 = players.A2CAgent(actor_model=actor, critic_model=critic, discount=param.DISCOUNT,
