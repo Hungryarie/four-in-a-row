@@ -356,6 +356,54 @@ class func_model1(model_base):
         return model
 
 
+class ACmodel1(model_base):
+    """
+    Good hyperparameters:
+    - par_loss='mse', par_opt=Adam(lr=0.001) against drunk and against itself
+
+    Medium hyperparameters:
+    -
+
+    Bad hyperparameters:
+    - par_loss='logcosh', par_opt=Adam(lr=0.01), par_metrics='accuracy', par_final_act='linear' loss explosion at 600 steps
+    - par_loss='logcosh', par_opt=Adam(lr=0.001), par_metrics='accuracy', par_final_act='linear' loss explosion at 10k steps
+    - par_loss='categorical_crossentropy', par_opt=Adam(lr=0.01), clipnorm=1.0, clipvalue=0.5, par_metrics='accuracy', par_final_act='linear'
+    - par_loss='categorical_crossentropy', par_opt=Adam(lr=0.001), clipnorm=1.0, clipvalue=0.5, par_metrics='accuracy', par_final_act='linear'
+    """
+    def __init__(self, **kwargs):
+        # defaults keyword arguments
+        kwargs['par_loss'] = kwargs.pop('par_loss', 'mse')
+        kwargs['par_opt'] = kwargs.pop('par_opt', Adam(lr=0.001))
+        kwargs['par_metrics'] = kwargs.pop('par_metrics', 'accuracy')
+        kwargs['par_final_act'] = kwargs.pop('par_final_act', 'softmax')
+
+        super().__init__(**kwargs)
+        self.model.model_name = '3xconv+3xdenseSMALL3x3(twohead)-HEnormal(ReLu)'
+        self.model.hyper_dict['model_name'] = self.model.model_name
+        self.append_hyperpar_to_name()
+
+    def create_model(self, input_shape, output_num):
+        multipl = self.layer_multiplier
+
+        inputs = Input(shape=input_shape)
+
+        x = Conv2D(24 * multipl, (3, 3), input_shape=input_shape, data_format="channels_last", padding='same', activation='relu', kernel_initializer='he_normal')(inputs)
+        x = Conv2D(48 * multipl, (3, 3), padding='same', activation='relu', kernel_initializer='he_normal')(x)
+        x = Conv2D(96 * multipl, (3, 3), padding='same', activation='relu', kernel_initializer='he_normal')(x)
+        x = Flatten()(x)
+        act = Dense(128 * multipl, activation='relu', kernel_initializer='he_normal')(x)
+        act = Dense(64 * multipl, activation='relu', kernel_initializer='he_normal')(act)
+        act_predictions = Dense(output_num, activation=self.fin_activation, kernel_initializer='he_normal')(act)
+
+        crit = Dense(128 * multipl, activation='relu', kernel_initializer='he_normal')(x)
+        crit = Dense(64 * multipl, activation='relu', kernel_initializer='he_normal')(crit)
+        crit_predictions = Dense(1, activation='linear', kernel_initializer='he_normal')(crit)
+
+        model = FuncModel(inputs=inputs, outputs=[act_predictions, crit_predictions])
+
+        return model
+
+
 class func_model_duel1b(model_base):
     """dueling model (using functional Keras API)
     without extra dense layer after model split.
