@@ -30,7 +30,10 @@ class AnalyseModel:
                 del layer_outputs[idx]
                 break
 
-        # add final layer (if not present)
+        # add final (two) layer(s) (if not present)
+        final_layer = model.layers[len(model.layers) - 2]
+        if final_layer.output.name != layer_outputs[-2].name:
+            layer_outputs.append(final_layer.output)
         final_layer = model.layers[len(model.layers) - 1]
         if final_layer.output.name != layer_outputs[-1].name:
             layer_outputs.append(final_layer.output)
