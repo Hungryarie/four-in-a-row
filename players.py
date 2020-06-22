@@ -260,7 +260,7 @@ class Selfplay(Player):
 
 
 class A2CAgent(Player):
-    def __init__(self, actor_model, critic_model, discount, *args, enriched_features=True):
+    def __init__(self, actor_model, critic_model, discount, *args, twohead_model=None, enriched_features=True):
         """
         A2C(Advantage Actor-Critic) agent\n
         https://github.com/rlcode/reinforcement-learning/blob/master/2-cartpole/4-actor-critic/cartpole_a2c.py
@@ -276,18 +276,26 @@ class A2CAgent(Player):
         self.discount_factor = discount  # 0.99
 
         # create model for policy network
-        self.actor = actor_model.model      # self.build_actor()
-        self.critic = critic_model.model    # self.build_critic()
+        self.actor = None
+        self.critic = None
+        self.twohead = None
+        if actor_model is not None:
+            self.actor = actor_model.model
+            self.action_size = self.actor.hyper_dict['output_num']      # get size of state and action
+            # model metadata
+            self.model = self.actor     # for usage in setup_for_training() - > needs proper fix!
+        if critic_model is not None:
+            self.critic = critic_model.model
+            self.value_size = self.critic.hyper_dict['output_num']      # get size of state and action
+        if twohead_model is not None:
+            self.twohead = twohead_model.model
+            self.action_size = self.twohead.hyper_dict['output_num']  # get size of state and action
+            self.value_size = 1   # get size of state and action
+            # model metadata
+            self.model = self.twohead     # for usage in setup_for_training() - > needs proper fix!
 
-        # get size of state and action
-        self.value_size = self.critic.hyper_dict['output_num']  # self.critic.out_num
-        self.action_size = self.actor.hyper_dict['output_num']  # self.actor.out_num
-
-        # model metadata
-        self.model = self.actor     # for usage in setup_for_training() - > needs proper fix!
-
-    # using the output of policy network, pick action stochastically
     def get_action(self, state, actionspace, **kwargs):
+        """ using the output of policy network, pick action stochastically"""
         # state = np.array(state).reshape(-1, *state.shape)
         # policy = self.actor.predict(state, batch_size=1).flatten()
         policy = self.get_qs(state)
@@ -304,7 +312,10 @@ class A2CAgent(Player):
     def get_qs(self, state):
         state = state[np.newaxis, :, :]  # add one dimention in order to work (6,7,4) => (1,6,7,4)
 
-        policy = self.actor.predict(state).flatten()
+        if self.actor is not None:
+            policy = self.actor.predict(state).flatten()
+        if self.twohead is not None:
+            policy = self.twohead.predict(state)[0].flatten()   # index 0 is the policy, index 1 is the state-value
         return policy
 
     def select_cell(self, state, actionspace, **kwargs):
@@ -324,6 +335,7 @@ class A2CAgent(Player):
 
     def discounted_rewards(self, rewards):
         """ Compute the discounted rewards over an episode
+        (https://github.com/germain-hug/Deep-RL-Keras/blob/master/A2C/a2c.py)
         """
         discounted_r, cumul_r = np.zeros_like(rewards), 0
         for t in reversed(range(0, len(rewards))):
@@ -361,17 +373,23 @@ class A2CAgent(Player):
         # Compute discounted rewards and Advantage (TD. Error)
         discounted_rewards = self.discounted_rewards(rewards)
         states = np.array(states)
-        state_values = self.critic.predict(states)
-        advantages = discounted_rewards - np.reshape(state_values, len(state_values))
+        if self.critic is not None:
+            state_values = self.critic.predict(states)
+        elif self.twohead is not None:
+            state_values = self.twohead.predict(states)[1]
+        #advantages = discounted_rewards - np.reshape(state_values, len(state_values))
+        advantages = discounted_rewards - np.squeeze(state_values)
         advantages_onehot = np.zeros((len(state_values), self.action_size))
         for idx, adv in enumerate(advantages_onehot):
             action = actions[idx]
             adv[action] = advantages[idx]
 
         # Networks optimization
-        self.actor.fit(states, advantages_onehot, epochs=1, verbose=0, callbacks=[self.tensorboard])
-        self.critic.fit(states, discounted_rewards, epochs=1, verbose=0, callbacks=[self.tensorboard])
-        pass
+        if self.actor is not None:
+            self.actor.fit(states, advantages_onehot, epochs=1, verbose=0, callbacks=[self.tensorboard])
+            self.critic.fit(states, discounted_rewards, epochs=1, verbose=0, callbacks=[self.tensorboard])
+        elif self.twohead is not None:
+            self.twohead.fit(states, [advantages_onehot, discounted_rewards], epochs=1, verbose=0, callbacks=[self.tensorboard])
 
 
 class DDQNPlayer(Player):
