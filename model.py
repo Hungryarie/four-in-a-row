@@ -9,6 +9,7 @@ from tensorflow.keras.layers import BatchNormalization
 import tensorflow.keras.backend as K
 from tensorflow.keras.optimizers import Adam, SGD, RMSprop
 from tensorflow.keras import initializers
+from tensorflow.keras import regularizers
 
 # from constants import *
 # from game import FiarGame
@@ -61,6 +62,7 @@ class model_base:
         self.metrics = par_metrics
         self.fin_activation = par_final_act
         self.layer_multiplier = kwargs.pop('par_layer_multiplier', 1)
+        self.regulatror_const = 0.0001
 
         # create models
         self.model = self.create_model(input_shape, output_num)
@@ -124,6 +126,35 @@ class model_base:
 
         self.model.model_name += f'({loss_name}^{self.model.optimizer_name}^lr={self.model._lr}{clip_string}^{self.fin_activation})'
         self.model.hyper_dict['model_name'] += f'({loss_name}^{self.model.optimizer_name}^lr={self.model._lr}{clip_string}^{self.fin_activation})'
+
+    def conv_layer(self, x, filters, kernel_size):
+        # https://github.com/AppliedDataSciencePartners/DeepReinforcementLearning/blob/master/model.py
+        x = Conv2D(filters=filters,
+                   kernel_size=kernel_size,
+                   data_format="channels_last",
+                   padding='same',
+                   use_bias=False,
+                   activation='linear',
+                   kernel_regularizer=regularizers.l2(self.regulatror_const))(x)
+        x = BatchNormalization(axis=1)(x)
+        x = LeakyReLU()(x)
+        return (x)
+
+    def residual_layer(self, input_block, filters, kernel_size):
+        # https://github.com/AppliedDataSciencePartners/DeepReinforcementLearning/blob/master/model.py
+        x = self.conv_layer(input_block, filters, kernel_size)
+        x = Conv2D(filters=filters,
+                   kernel_size=kernel_size,
+                   data_format="channels_last",
+                   padding='same',
+                   use_bias=False,
+                   activation='linear',
+                   kernel_regularizer=regularizers.l2(self.regulatror_const))(x)
+        x = BatchNormalization(axis=1)(x)
+        x = add([input_block, x])
+        x = LeakyReLU()(x)
+        return (x)
+
     """
     def huber_loss(self, y_true, y_pred, clip_delta=1.0):
         # not easy to load model with custom loss function.
@@ -379,7 +410,7 @@ class ACmodel1(model_base):
         kwargs['par_final_act'] = kwargs.pop('par_final_act', 'softmax')
 
         super().__init__(**kwargs)
-        self.model.model_name = '3xconv+3xdenseSMALL3x3(twohead)-HEnormal(ReLu) RESIDUAL'
+        self.model.model_name = '3xconv+3xdenseSMALL3x3(twohead)-HEnormal(LEAKYReLu) RESIDUAL'
         self.model.hyper_dict['model_name'] = self.model.model_name
         self.append_hyperpar_to_name()
 
@@ -387,32 +418,85 @@ class ACmodel1(model_base):
         multipl = self.layer_multiplier
 
         inputs = Input(shape=input_shape)
-
         x = Conv2D(24 * multipl, (3, 3), input_shape=input_shape, use_bias=False, data_format="channels_last", padding='same', kernel_initializer='he_normal')(inputs)
         x = BatchNormalization()(x)
-        block_1_output = Activation('relu')(x)
+        #block_1_output = Activation('relu')(x)
+        block_1_output = LeakyReLU(alpha=0.2)(x)
         x = Conv2D(24 * multipl, (3, 3), use_bias=False, padding='same', kernel_initializer='he_normal')(block_1_output)
         x = BatchNormalization()(x)
-        x = Activation('relu')(x)
+        #x = Activation('relu')(x)
+        x = LeakyReLU(alpha=0.2)(x)
         x = Add()([x, block_1_output])
 
         x = Conv2D(48 * multipl, (3, 3), padding='same', use_bias=False, kernel_initializer='he_normal')(x)
         x = BatchNormalization()(x)
-        block_2_output = Activation('relu')(x)
+        #block_2_output = Activation('relu')(x)
+        block_2_output = LeakyReLU(alpha=0.2)(x)
         x = Conv2D(48 * multipl, (3, 3), padding='same', use_bias=False, kernel_initializer='he_normal')(block_2_output)
         x = BatchNormalization()(x)
-        x = Activation('relu')(x)
+        #x = Activation('relu')(x)
+        x = LeakyReLU(alpha=0.2)(x)
         x = Add()([x, block_2_output])
 
         x = Conv2D(96 * multipl, (3, 3), padding='same', use_bias=False, kernel_initializer='he_normal')(x)
         x = BatchNormalization()(x)
-        block_3_output = Activation('relu')(x)
+        #block_3_output = Activation('relu')(x)
+        block_3_output = LeakyReLU(alpha=0.2)(x)
         x = Conv2D(96 * multipl, (3, 3), padding='same', use_bias=False, kernel_initializer='he_normal')(block_3_output)
         x = BatchNormalization()(x)
-        x = Activation('relu')(x)
+        #x = Activation('relu')(x)
+        x = LeakyReLU(alpha=0.2)(x)
         x = Add()([x, block_3_output])
 
 
+        x = Flatten()(x)
+        act = Dense(128 * multipl, activation='relu', kernel_initializer='he_normal')(x)
+        act = Dense(64 * multipl, activation='relu', kernel_initializer='he_normal')(act)
+        act_predictions = Dense(output_num, activation=self.fin_activation, kernel_initializer='he_normal')(act)
+
+        crit = Dense(128 * multipl, activation='relu', kernel_initializer='he_normal')(x)
+        crit = Dense(64 * multipl, activation='relu', kernel_initializer='he_normal')(crit)
+        crit_predictions = Dense(1, activation='linear', kernel_initializer='he_normal')(crit)
+
+        model = FuncModel(inputs=inputs, outputs=[act_predictions, crit_predictions])
+
+        return model
+
+
+class ACmodel2(model_base):
+    """
+    Good hyperparameters:
+    - par_loss='mse', par_opt=Adam(lr=0.001) against drunk and against itself
+
+    Medium hyperparameters:
+    -
+
+    Bad hyperparameters:
+    - par_loss='logcosh', par_opt=Adam(lr=0.01), par_metrics='accuracy', par_final_act='linear' loss explosion at 600 steps
+    - par_loss='logcosh', par_opt=Adam(lr=0.001), par_metrics='accuracy', par_final_act='linear' loss explosion at 10k steps
+    - par_loss='categorical_crossentropy', par_opt=Adam(lr=0.01), clipnorm=1.0, clipvalue=0.5, par_metrics='accuracy', par_final_act='linear'
+    - par_loss='categorical_crossentropy', par_opt=Adam(lr=0.001), clipnorm=1.0, clipvalue=0.5, par_metrics='accuracy', par_final_act='linear'
+    """
+    def __init__(self, **kwargs):
+        # defaults keyword arguments
+        kwargs['par_loss'] = kwargs.pop('par_loss', 'mse')
+        kwargs['par_opt'] = kwargs.pop('par_opt', Adam(lr=0.001))
+        kwargs['par_metrics'] = kwargs.pop('par_metrics', 'accuracy')
+        kwargs['par_final_act'] = kwargs.pop('par_final_act', 'softmax')
+
+        super().__init__(**kwargs)
+        self.model.model_name = '3xconv+3xdenseSMALL3x3(twohead)-HEnormal(LEAKYReLu) RESIDUAL'
+        self.model.hyper_dict['model_name'] = self.model.model_name
+        self.append_hyperpar_to_name()
+
+    def create_model(self, input_shape, output_num):
+        multipl = self.layer_multiplier
+
+        inputs = Input(shape=input_shape)
+        x = self.conv_layer(inputs, 75 * multipl, (3, 3))
+        x = self.residual_layer(x, 75 * multipl, (3, 3))
+        x = self.residual_layer(x, 75 * multipl, (3, 3))
+        x = self.residual_layer(x, 75 * multipl, (3, 3))
         x = Flatten()(x)
         act = Dense(128 * multipl, activation='relu', kernel_initializer='he_normal')(x)
         act = Dense(64 * multipl, activation='relu', kernel_initializer='he_normal')(act)
