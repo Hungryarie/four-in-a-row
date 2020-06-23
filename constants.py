@@ -2,13 +2,14 @@
 class TrainingParameters():
     def __init__(self):
         # Constants
-        self.DISCOUNT = 0.99  # 0.99
+        self.DISCOUNT = 0.95  # 0.99
         self.REPLAY_MEMORY_SIZE = 10_000  # 25_000  # 50_000  # How many last steps to keep for model training
         self.MIN_REPLAY_MEMORY_SIZE = 1_000  # Minimum number of steps in a memory to start training
         self.MINIBATCH_SIZE = 64  # How many steps (samples) to use for training
         self.UPDATE_TARGET_EVERY = 5  # Terminal states (end of episodes)
         self.MIN_REWARD = -60  # 120 # For model save
         self.MEMORY_FRACTION = 0.20  # not so relevant yet (only gpu)
+        self.REGULATOR_CONST = 0.0001
 
         # Environment settings
         self.EPISODES = 20_000
@@ -21,7 +22,7 @@ class TrainingParameters():
         self.MIN_TAU = 0.006
 
         #  Stats settings
-        self.AGGREGATE_STATS_EVERY = 10  # episodes
+        self.AGGREGATE_STATS_EVERY = 25  # episodes
         self.SHOW_PREVIEW = True
 
         # Training reward setting
