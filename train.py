@@ -80,6 +80,7 @@ class TrainAgent:
 
         if self.debug:
             self.analyse_model = AnalyseModel()  # make analyse model of each layer
+            self.analyse_model.set_analyze_layers([1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20])
             self.analyse_model.update_model(self.env.player1.model)
             self.analyse_model.reset_figs()
 
@@ -111,10 +112,11 @@ class TrainAgent:
 
             if self.debug:
                 # analyse model graphically
-                self.analyse_model.update_model(self.env.player1.model)
-                self.analyse_model.visual_debug_train(state=self.env.featuremap, turns=self.env.turns,
-                                                      save_to_file=save_to_file, print_num=False,
-                                                      prefix=f'actor @ episode {self.count_stats.episode}')
+                if self.env.current_player == 1 or done:
+                    self.analyse_model.update_model(self.env.player1.model)
+                    self.analyse_model.visual_debug_train(state=self.env.featuremap, turns=self.env.turns,
+                                                          save_to_file=save_to_file, print_num=False,
+                                                          prefix=f'actor @ episode {self.count_stats.episode}')
                 if done:
                     if self.env.player1.critic is not None:
                         self.analyse_model.reset_figs()
@@ -184,6 +186,12 @@ class TrainAgent:
             states_adj, actions_adj, rewards_adj = self.correct_states_actions_rewards(self.step_dict['start_state'][1],
                                                                                        self.step_dict['action'][1],
                                                                                        self.step_dict['reward'][1])
+            """states_adj2, actions_adj2, rewards_adj2 = self.correct_states_actions_rewards(self.step_dict['start_state'][2],
+                                                                                          self.step_dict['action'][2],
+                                                                                          self.step_dict['reward'][2])
+            states_adj = states_adj + states_adj2
+            actions_adj = actions_adj + actions_adj2
+            rewards_adj = rewards_adj + rewards_adj2"""
             self.env.player1.train_model(states_adj, actions_adj, rewards_adj)
 
             # analyse / review every x episodes
@@ -235,8 +243,8 @@ class TrainAgent:
             # use exploration for player 1
             # get probability based action
             # self.count_stats.tau = self.count_stats.epsilon
-            action = self.env.active_player.get_prob_action(state=state, actionspace=self.env.action_space, tau=self.count_stats.tau)
-            # action = self.env.active_player.get_prob_action(state=state, actionspace=self.env.action_space, tau=0.16)
+            #action = self.env.active_player.get_prob_action(state=state, actionspace=self.env.action_space, tau=self.count_stats.tau)
+            action = self.env.active_player.get_action(state=state, actionspace=self.env.action_space)
         else:
             action = self.env.active_player.select_cell(state=state, actionspace=self.env.action_space)
 
