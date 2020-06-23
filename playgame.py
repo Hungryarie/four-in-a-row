@@ -26,7 +26,7 @@ from model import func_model1_small_conv, func_model1, func_model_duel1b, func_m
 from model import ACmodel1, ACmodel2
 from analyse import AnalyseModel
 
-
+#test
 def train_in_class():
     # For more repetitive results
     random.seed(2)
