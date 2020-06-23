@@ -5,6 +5,7 @@ from tensorflow.keras import Sequential
 from tensorflow.keras.models import load_model, Model as FuncModel
 from tensorflow.keras.layers import Dense, Dropout, Conv2D, MaxPooling2D, Activation, Flatten
 from tensorflow.keras.layers import Input, Add, Subtract, Lambda, concatenate, add  # functional API specific
+from tensorflow.keras.layers import BatchNormalization
 import tensorflow.keras.backend as K
 from tensorflow.keras.optimizers import Adam, SGD, RMSprop
 from tensorflow.keras import initializers
@@ -387,9 +388,15 @@ class ACmodel1(model_base):
 
         inputs = Input(shape=input_shape)
 
-        x = Conv2D(24 * multipl, (3, 3), input_shape=input_shape, data_format="channels_last", padding='same', activation='relu', kernel_initializer='he_normal')(inputs)
-        x = Conv2D(48 * multipl, (3, 3), padding='same', activation='relu', kernel_initializer='he_normal')(x)
-        x = Conv2D(96 * multipl, (3, 3), padding='same', activation='relu', kernel_initializer='he_normal')(x)
+        x = Conv2D(24 * multipl, (3, 3), input_shape=input_shape, use_bias=False, data_format="channels_last", padding='same', kernel_initializer='he_normal')(inputs)
+        x = BatchNormalization()(x)
+        x = Activation('relu')(x)
+        x = Conv2D(48 * multipl, (3, 3), padding='same', use_bias=False, kernel_initializer='he_normal')(x)
+        x = BatchNormalization()(x)
+        x = Activation('relu')(x)
+        x = Conv2D(96 * multipl, (3, 3), padding='same', use_bias=False, kernel_initializer='he_normal')(x)
+        x = BatchNormalization()(x)
+        x = Activation('relu')(x)
         x = Flatten()(x)
         act = Dense(128 * multipl, activation='relu', kernel_initializer='he_normal')(x)
         act = Dense(64 * multipl, activation='relu', kernel_initializer='he_normal')(act)
