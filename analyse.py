@@ -19,8 +19,18 @@ class AnalyseModel:
 
         self.state_memory_list = []
 
-    def update_model(self, model, analyze_layers=[1, 2, 3, 4, 5, 6]):
+        self.analyze_layers = [1, 2, 3, 4, 5, 6]
+
+    def set_analyze_layers(self, analyze_layers):
+        """set the layers to visualize/analyze\n
+        input: list of numbers""" 
+        self.analyze_layers = analyze_layers
+
+    def update_model(self, model, analyze_layers=None):
         """Updates the model with new weights (for instance during training) """
+
+        if analyze_layers is None:
+            analyze_layers = self.analyze_layers
 
         layer_outputs = [model.layers[layer_num].output for layer_num in analyze_layers if layer_num <= len(model.layers) - 1]               # Extracts the outputs of the top x layers
 
