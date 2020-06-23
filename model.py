@@ -3,7 +3,7 @@ import tensorflow as tf
 
 from tensorflow.keras import Sequential
 from tensorflow.keras.models import load_model, Model as FuncModel
-from tensorflow.keras.layers import Dense, Dropout, Conv2D, MaxPooling2D, Activation, Flatten
+from tensorflow.keras.layers import Dense, Dropout, Conv2D, MaxPooling2D, Activation, Flatten, LeakyReLU
 from tensorflow.keras.layers import Input, Add, Subtract, Lambda, concatenate, add  # functional API specific
 from tensorflow.keras.layers import BatchNormalization
 import tensorflow.keras.backend as K
@@ -379,7 +379,7 @@ class ACmodel1(model_base):
         kwargs['par_final_act'] = kwargs.pop('par_final_act', 'softmax')
 
         super().__init__(**kwargs)
-        self.model.model_name = '3xconv+3xdenseSMALL3x3(twohead)-HEnormal(ReLu)'
+        self.model.model_name = '3xconv+3xdenseSMALL3x3(twohead)-HEnormal(ReLu) RESIDUAL'
         self.model.hyper_dict['model_name'] = self.model.model_name
         self.append_hyperpar_to_name()
 
@@ -390,13 +390,29 @@ class ACmodel1(model_base):
 
         x = Conv2D(24 * multipl, (3, 3), input_shape=input_shape, use_bias=False, data_format="channels_last", padding='same', kernel_initializer='he_normal')(inputs)
         x = BatchNormalization()(x)
+        block_1_output = Activation('relu')(x)
+        x = Conv2D(24 * multipl, (3, 3), use_bias=False, padding='same', kernel_initializer='he_normal')(block_1_output)
+        x = BatchNormalization()(x)
         x = Activation('relu')(x)
+        x = Add()([x, block_1_output])
+
         x = Conv2D(48 * multipl, (3, 3), padding='same', use_bias=False, kernel_initializer='he_normal')(x)
         x = BatchNormalization()(x)
-        x = Activation('relu')(x)
-        x = Conv2D(96 * multipl, (3, 3), padding='same', use_bias=False, kernel_initializer='he_normal')(x)
+        block_2_output = Activation('relu')(x)
+        x = Conv2D(48 * multipl, (3, 3), padding='same', use_bias=False, kernel_initializer='he_normal')(block_2_output)
         x = BatchNormalization()(x)
         x = Activation('relu')(x)
+        x = Add()([x, block_2_output])
+
+        x = Conv2D(96 * multipl, (3, 3), padding='same', use_bias=False, kernel_initializer='he_normal')(x)
+        x = BatchNormalization()(x)
+        block_3_output = Activation('relu')(x)
+        x = Conv2D(96 * multipl, (3, 3), padding='same', use_bias=False, kernel_initializer='he_normal')(block_3_output)
+        x = BatchNormalization()(x)
+        x = Activation('relu')(x)
+        x = Add()([x, block_3_output])
+
+
         x = Flatten()(x)
         act = Dense(128 * multipl, activation='relu', kernel_initializer='he_normal')(x)
         act = Dense(64 * multipl, activation='relu', kernel_initializer='he_normal')(act)
