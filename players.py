@@ -228,6 +228,11 @@ class Stick(Player):
         action = self.select_cell(*args, **kwargs)
         return action
 
+    def get_action(self, state, actionspace, **kwargs):
+        # logging.error("Stick class has no probability action")
+        action = self.select_cell(*args, **kwargs)
+        return action
+
 
 class Selfplay(Player):
     def __init__(self, player, *args, **kwargs):
@@ -267,10 +272,6 @@ class A2CAgent(Player):
         """
         super().__init__(*args)
         self.enriched_features = enriched_features
-        """if self.enriched_features:
-            self.channels = 4
-        else:
-            self.channels = 1"""
 
         # These are hyper parameters for the Policy Gradient
         self.discount_factor = discount  # 0.99
@@ -296,18 +297,16 @@ class A2CAgent(Player):
 
     def get_action(self, state, actionspace, **kwargs):
         """ using the output of policy network, pick action stochastically"""
-        # state = np.array(state).reshape(-1, *state.shape)
-        # policy = self.actor.predict(state, batch_size=1).flatten()
         policy = self.get_qs(state)
 
-        # set probability to zero for all blocked actions
-        nb_actions = policy.shape[0]
-        no_action = np.arange(nb_actions).astype(int)
-        no_action = np.delete(no_action, actionspace)
-        policy[no_action] = 0
+        self.set_policy_info(policy)
 
-        choise = np.random.choice(actionspace, 1, p=policy)
-        return choise[0]
+        choise = np.random.choice(range(len(policy)), p=policy)
+        if choise not in actionspace:
+            choise = np.random.choice(actionspace)
+
+        self.set_probability_info(policy)
+        return choise
 
     def get_qs(self, state):
         state = state[np.newaxis, :, :]  # add one dimention in order to work (6,7,4) => (1,6,7,4)
@@ -319,7 +318,6 @@ class A2CAgent(Player):
         return policy
 
     def select_cell(self, state, actionspace, **kwargs):
-        # state = state[np.newaxis, :, :]  # add one dimention in order to work (6,7,4) => (1,6,7,4)
 
         qs = self.get_qs(state)
 
@@ -334,13 +332,33 @@ class A2CAgent(Player):
         return action
 
     def discounted_rewards(self, rewards):
-        """ Compute the discounted rewards over an episode
+        """Compute the discounted rewards over an episode
         (https://github.com/germain-hug/Deep-RL-Keras/blob/master/A2C/a2c.py)
         """
         discounted_r, cumul_r = np.zeros_like(rewards), 0
         for t in reversed(range(0, len(rewards))):
             cumul_r = rewards[t] + cumul_r * self.discount_factor
             discounted_r[t] = cumul_r
+        return discounted_r
+
+    def discounted_rewards_norm(self, rewards):
+        """Compute the discounted rewards over an episode\n
+        with normalisation
+        https://www.youtube.com/watch?v=IS0V8z8HXrM (16 minute)"""
+
+        discounted_r = np.zeros_like(rewards)
+        for t in range(len(rewards)):
+            cumul_r = 0
+            discount = 1
+            for k in range(t, len(rewards)):
+                cumul_r += rewards[k] * discount
+                discount *= self.discount_factor
+            discounted_r[t] = cumul_r
+
+        # scale the rewards: reinforcement baseline (algoritm) -> 
+        mean = np.mean(discounted_r)
+        std = np.std(discounted_r) if np.std(discounted_r) > 0 else 1
+        discounted_r = (discounted_r - mean) / std
         return discounted_r
 
     # update policy network every episode
@@ -371,15 +389,19 @@ class A2CAgent(Player):
         """ Update actor and critic networks from experience
         """
         # Compute discounted rewards and Advantage (TD. Error)
-        discounted_rewards = self.discounted_rewards(rewards)
+        #discounted_rewards = self.discounted_rewards(rewards)
+        discounted_rewards = self.discounted_rewards_norm(rewards)
         states = np.array(states)
         if self.critic is not None:
             state_values = self.critic.predict(states)
         elif self.twohead is not None:
-            state_values = self.twohead.predict(states)[1]
+            predictions = self.twohead.predict(states)
+            state_values = predictions[1]
+            policy_values = predictions[0]
         #advantages = discounted_rewards - np.reshape(state_values, len(state_values))
         advantages = discounted_rewards - np.squeeze(state_values)
-        advantages_onehot = np.zeros((len(state_values), self.action_size))
+        #advantages_onehot = np.zeros((len(state_values), self.action_size))
+        advantages_onehot = np.copy(policy_values)
         for idx, adv in enumerate(advantages_onehot):
             action = actions[idx]
             adv[action] = advantages[idx]
