@@ -50,22 +50,65 @@ class TrainAgent:
             os.makedirs('models')
 
         # for stats
+        self.setup_logging(log_filename, log_flag)
+
+        # set new counter class
+        self.count_stats = Stats()
+
+    def setup_logging(self, log_filename, log_flag):
         self.log = ModelLog(log_filename, log_flag)
-        # self.log.add_player_info_old(self.env.player1, self.env.player2)
         self.log.add_player_info(self.env.player1)
         self.log.add_player_info(self.env.player2)
-        if self.env.player1.actor is not None:
-            self.log.add_modelinfo(1, self.env.player1.actor, "actor")
-            self.log.add_modelinfo(1, self.env.player1.critic, "critic")
-        if self.env.player1.twohead is not None:
-            self.log.add_modelinfo(1, self.env.player1.twohead, "twohead")
+
+        for model_name, model in self.env.player1.models_dic.items():
+            if type(model) == tf.python.keras.engine.training.Model or type(model) == tf.python.keras.engine.training_v1.Model:
+                self.log.add_modelinfo(1, model, model_name)
+
+        """
+        if hasattr(self.env.player1, 'actor'):
+            if self.env.player1.actor is not None:
+                self.log.add_modelinfo(1, self.env.player1.actor, "actor")
+                self.log.add_modelinfo(1, self.env.player1.critic, "critic")
+        if hasattr(self.env.player1, 'twohead'):
+            if self.env.player1.twohead is not None:
+                self.log.add_modelinfo(1, self.env.player1.twohead, "twohead")
+        if hasattr(self.env.player1, 'model'):
+            self.log.add_modelinfo(1, self.env.player1.model, "model")
+        if hasattr(self.env.player1, 'policy_model'):
+            self.log.add_modelinfo(1, self.env.player1.policy_model, "policy_model")
+        if hasattr(self.env.player1, 'predict_model'):
+            self.log.add_modelinfo(1, self.env.player1.predict_model, "predict_model")"""
+
         self.log.add_constants(self.para)
         self.log.write_to_csv()
         self.log.write_parameters_to_file()
-        self.log.plot_model(self.env.player1.model)
-        self.log.print_model_summary(self.env.player1.model)
 
-        self.count_stats = Stats()  # set new counter class
+        """if hasattr(self.env.player1, 'actor'):
+            if self.env.player1.actor is not None:
+                self.log.plot_model(self.env.player1.actor, 'actor')
+                self.log.print_model_summary(self.env.player1.actor, 'actor')
+        if hasattr(self.env.player1, 'critic'):
+            if self.env.player1.critic is not None:
+                self.log.plot_model(self.env.player1.critic, 'critic')
+                self.log.print_model_summary(self.env.player1.critic, 'critic')
+        if hasattr(self.env.player1, 'twohead'):
+            if self.env.player1.twohead is not None:
+                self.log.plot_model(self.env.player1.twohead, 'twohead')
+                self.log.print_model_summary(self.env.player1.twohead, 'twohead')
+        if hasattr(self.env.player1, 'model'):
+            self.log.plot_model(self.env.player1.model, 'model')
+            self.log.print_model_summary(self.env.player1.model, 'model')
+        if hasattr(self.env.player1, 'policy_model'):
+            self.log.plot_model(self.env.player1.policy_model, 'policy_model')
+            self.log.print_model_summary(self.env.player1.policy_model, 'policy_model')
+        if hasattr(self.env.player1, 'predict_model'):
+            self.log.plot_model(self.env.player1.predict_model, 'predict_model')
+            self.log.print_model_summary(self.env.player1.predict_model, 'predict_model')"""
+
+        for model_name, model in self.env.player1.models_dic.items():
+            if type(model) == tf.python.keras.engine.training.Model or type(model) == tf.python.keras.engine.training_v1.Model:
+                self.log.plot_model(model, model_name)
+                self.log.print_model_summary(model, model_name)
 
     def setup_training(self, train_description):
         # setup tensorboard for training
@@ -118,12 +161,13 @@ class TrainAgent:
                                                           save_to_file=save_to_file, print_num=False,
                                                           prefix=f'actor @ episode {self.count_stats.episode}')
                 if done:
-                    if self.env.player1.critic is not None:
-                        self.analyse_model.reset_figs()
-                        self.analyse_model.update_model(self.env.player1.critic)
-                        self.analyse_model.visual_debug_train(state=self.env.featuremap, turns=self.env.turns,
-                                                              save_to_file=True, print_num=False,
-                                                              prefix=f'critic @ episode {self.count_stats.episode}')
+                    if hasattr(self.env.player1, 'critic'):
+                        if self.env.player1.critic is not None:
+                            self.analyse_model.reset_figs()
+                            self.analyse_model.update_model(self.env.player1.critic)
+                            self.analyse_model.visual_debug_train(state=self.env.featuremap, turns=self.env.turns,
+                                                                  save_to_file=True, print_num=False,
+                                                                  prefix=f'critic @ episode {self.count_stats.episode}')
                     self.analyse_model.reset_figs()
 
     def _in_episode_stat_update(self):
@@ -166,7 +210,7 @@ class TrainAgent:
                 self.env.block_invalid_moves(x=self.para.MAX_INVALID_MOVES)  # high number to being able to actualy train upon
 
                 # select action, step, get reward (and train)
-                reward_p1, reward_p2, done = self.action_and_train(train_on_step=False)
+                reward_p1, reward_p2, done = self.action_and_train(train_on_step=True)
 
                 # for tensorboard logging etc
                 self._in_episode_stat_update()
@@ -183,16 +227,16 @@ class TrainAgent:
             # TRAININGPART
             # self.visualize_state_action_rewards(self.step_dict['start_state'][1], self.step_dict['action'][1], self.step_dict['reward'][1])
             # self.visualize_state_action_rewards(self.step_dict['start_state'][2], self.step_dict['action'][2], self.step_dict['reward'][2])
-            states_adj, actions_adj, rewards_adj = self.correct_states_actions_rewards(self.step_dict['start_state'][1],
+            """states_adj, actions_adj, rewards_adj = self.correct_states_actions_rewards(self.step_dict['start_state'][1],
                                                                                        self.step_dict['action'][1],
-                                                                                       self.step_dict['reward'][1])
+                                                                                       self.step_dict['reward'][1])"""
             """states_adj2, actions_adj2, rewards_adj2 = self.correct_states_actions_rewards(self.step_dict['start_state'][2],
                                                                                           self.step_dict['action'][2],
                                                                                           self.step_dict['reward'][2])
             states_adj = states_adj + states_adj2
             actions_adj = actions_adj + actions_adj2
             rewards_adj = rewards_adj + rewards_adj2"""
-            self.env.player1.train_model(states_adj, actions_adj, rewards_adj)
+            """self.env.player1.train_model(states_adj, actions_adj, rewards_adj)"""
 
             # analyse / review every x episodes
             self._episode_review(per_x_episode=self.para.AGGREGATE_STATS_EVERY, done=True)
@@ -243,7 +287,7 @@ class TrainAgent:
             # use exploration for player 1
             # get probability based action
             # self.count_stats.tau = self.count_stats.epsilon
-            #action = self.env.active_player.get_prob_action(state=state, actionspace=self.env.action_space, tau=self.count_stats.tau)
+            # action = self.env.active_player.get_prob_action(state=state, actionspace=self.env.action_space, tau=self.count_stats.tau)
             action = self.env.active_player.get_action(state=state, actionspace=self.env.action_space)
         else:
             action = self.env.active_player.select_cell(state=state, actionspace=self.env.action_space)
@@ -287,15 +331,18 @@ class TrainAgent:
             # reward after invalid move
             reward = self.step_dict['reward'][self.env.active_player.player_id][-1]
 
-            # print("\n----------\n")
-            # self.env.ShowField2(field=state)
-            # print(f"\naction:{action}\n")
-            # self.env.ShowField2(field=next_state)
-            # print(f"\nreward:{reward}\n")
+            print("\n----------\n")
+            self.env.ShowField2(field=state)
+            print(f"\naction:{action}\n")
+            self.env.ShowField2(field=next_state)
+            print(f"\nreward:{reward}\n")
 
             if train_on_step:
                 self.env.active_player.train_model(state, action, reward, next_state, done)  # train with these parameters
+                self.env.active_player.train_model_step(state, action, reward, next_state, done)  # train with these parameters
                 # self.env.player1.train_model(state, action, reward, next_state, done)  # train with these parameters
+
+                self.env.active_player.print_policy_info(state, title="after training", run_this=self.debug)
         elif not done and train_on_step:
             # train on valid moves (from previous step)
             try:
@@ -332,6 +379,8 @@ class TrainAgent:
                     print("next state is none")
                 print(f"reward:{reward}")
 
+                self.env.inactive_player.print_policy_info(state, title="before training", run_this=False)
+
             # only train when a previous step has been played. hence action should not be None.
             if action is not None:
                 # print("\n----------\n")
@@ -339,7 +388,10 @@ class TrainAgent:
                 # print(f"\naction:{action}\n")
                 # self.env.ShowField2(field=next_state)
                 self.env.inactive_player.train_model(state, action, reward, next_state, done)   # train with these parameters
+                self.env.inactive_player.train_model_step(state, action, reward, next_state, done)   # train with these parameters
                 # self.env.player1.train_model(state, action, reward, next_state, done)   # train with these parameters
+
+            self.env.inactive_player.print_policy_info(state, title="after training", run_this=self.debug)
 
         # train one final time when done==true. Otherwise the final (most important! => win/lose) action is not being trained on / logged.
         if done:
@@ -377,7 +429,10 @@ class TrainAgent:
                     print(f"reward:{reward}")
 
                 self.env.active_player.train_model(state, action, reward, next_state, done)
+                self.env.active_player.train_model_step(state, action, reward, next_state, done)
                 # self.env.player1.train_model(state, action, reward, next_state, done)   # train with these parameters
+
+                self.env.active_player.print_policy_info(state, title="after training", run_this=self.debug)
 
                 # (inactive player : loser)
                 # get state, action and reward for loser, because it is based on previous step it is always the losing step.
@@ -407,8 +462,13 @@ class TrainAgent:
                     self.env.ShowField2(field=next_state)
                     print(f"reward:{reward}")
 
+                self.env.inactive_player.print_policy_info(state, title="before training", run_this=False)
+
                 self.env.inactive_player.train_model(state, action, reward, next_state, done)
+                self.env.inactive_player.train_model_step(state, action, reward, next_state, done)
                 # self.env.player1.train_model(state, action, reward, next_state, done)   # train with these parameters
+
+                self.env.inactive_player.print_policy_info(state, title="after training", run_this=self.debug)
 
         return reward_p1, reward_p2, done
 
@@ -485,7 +545,14 @@ class TrainAgent:
 
     def save_model(self, player):
         timestamp = player.model.timestamp
-        if player.actor is not None:
+
+        for model_name, model in player.models_dic.items():
+            if type(model) == tf.python.keras.engine.training.Model or type(model) == tf.python.keras.engine.training_v1.Model:
+                new_model_name = f'models/A2C/{timestamp}-{int(time.time())}_ep{self.count_stats.episode}_{model_name}.model'
+                path = os.path.normpath(os.path.join(os.getcwd(), new_model_name))
+                model.save(path)
+
+        """if player.actor is not None:
             actor_model_name = f'models/A2C/{timestamp}-{int(time.time())}_ep{self.count_stats.episode}_actor.model'
             critic_model_name = f'models/A2C/{timestamp}-{int(time.time())}_ep{self.count_stats.episode}_critic.model'
 
@@ -497,7 +564,7 @@ class TrainAgent:
         elif player.twohead is not None:
             twohead_model_name = f'models/A2C/{timestamp}-{int(time.time())}_ep{self.count_stats.episode}_twohead.model'
             twohead_path = os.path.normpath(os.path.join(os.getcwd(), twohead_model_name))
-            player.twohead.save(twohead_path)
+            player.twohead.save(twohead_path)"""
 
     def save_img(self, per_x_episode):
         if self.count_stats.episode % per_x_episode == 0:
