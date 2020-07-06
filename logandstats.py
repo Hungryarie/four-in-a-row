@@ -86,8 +86,9 @@ class ModelLog():
         dic['model_info'] = model_info
         dic['model_loss'] = model.loss
         dic['model_acc'] = model.metrics
-        dic.update(model.hyper_dict)  # extent dic with model hyper dictionary (eg. name, class, timestamp, optimizer name, learning rate, final activation layertype etc.)
-        dic['model_fullname'] = f'{dic["model_class"]}_{dic["model_name"]}_startstamp{dic["timestamp"]}'
+        if hasattr(model, 'hyper_dict'):
+            dic.update(model.hyper_dict)  # extent dic with model hyper dictionary (eg. name, class, timestamp, optimizer name, learning rate, final activation layertype etc.)
+            dic['model_fullname'] = f'{dic["model_class"]}_{dic["model_name"]}_startstamp{dic["timestamp"]}'
         self.model_dict.append(dic)
 
     def add_constants(self, parameters):
@@ -202,16 +203,20 @@ class ModelLog():
                 parameter_writer.writerow([self.timestamp, self.timenow, i, self.get_info(i, "player_class"), self.get_info(i, "player_name"), self.get_info(i, "model_class"), self.get_info(i, "model_name"), self.get_info(i, "model_loss"), self.get_info(i, "model_opt_name"), self.get_info(i, "model_lr"), self.get_info(i, "model_timestamp"), self.get_info(i, "model_fullname"), self.get_info(i, "model_used_path")])
         parameters_file.close()
 
-    def plot_model(self, model):
-        path = f"models/modelplots/{self.timestamp}-{model.model_class}.png"
+    def plot_model(self, model, name):
+        if hasattr(model, 'model_class'):
+            model_class = model.model_class
+        else:
+            model_class = "NA"
+        path = f"models/modelplots/{self.timestamp}-{model_class}-{name}.png"
         model._layers = [layer for layer in model._layers if not isinstance(layer, dict)]  # workaround for bug: https://github.com/tensorflow/tensorflow/issues/38988
         model._layers = [layer for layer in model._layers if isinstance(layer, tf.keras.layers.Layer)]
         plot_model(model, path, show_shapes=True)
-        self.log_text_to_file(f"stored model plot:{path}")
+        self.log_text_to_file(f"stored ({name}) model plot:{path}")
 
-    def print_model_summary(self, model):
+    def print_model_summary(self, model, name):
         stringlist = []
         model.summary(print_fn=lambda x: stringlist.append(x))
         short_model_summary = "\n".join(stringlist)
-        self.log_text_to_file("Model summary:")
+        self.log_text_to_file(f"({name})Model summary:")
         self.log_text_to_file(short_model_summary)
