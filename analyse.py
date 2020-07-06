@@ -23,7 +23,7 @@ class AnalyseModel:
 
     def set_analyze_layers(self, analyze_layers):
         """set the layers to visualize/analyze\n
-        input: list of numbers""" 
+        input: list of numbers"""
         self.analyze_layers = analyze_layers
 
     def update_model(self, model, analyze_layers=None):
