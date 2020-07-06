@@ -15,11 +15,11 @@ class FiarGame:
         self.columns = 7
         self._extra_toprows = 1  # extra rows at the top of the playingfield (can be used for feature engineering)
 
-        self.playingField = np.zeros([self.rows + self._extra_toprows, self.columns], dtype=float) # int
+        self.playingField = np.zeros([self.rows + self._extra_toprows, self.columns], dtype=float)  # int
         self.playingField = self.playingField[:, :, np.newaxis]
-        self.featuremap = np.zeros([self.rows + self._extra_toprows, self.columns, 4], dtype=float) # int
+        self.featuremap = np.zeros([self.rows + self._extra_toprows, self.columns, 4], dtype=float)  # int
 
-        #self.reset()
+        # self.reset()
 
     def add_players(self, player1, player2):
         self.player1 = player1
