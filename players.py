@@ -60,6 +60,10 @@ class Player:
         """pass: no train_model method implemented"""
         pass
 
+    def train_model_step(self, *args, **kwargs):  # state, action, reward, next_state, done
+        """pass: no train_model_step method implemented"""
+        pass
+
     def inverse_state(self, state):
         """swap the player_value in the playingfield/state"""
         inverse = np.array(state) * -1
@@ -166,9 +170,31 @@ class Player:
 
         return self.changiness
 
+    def print_policy_info(self, state, title=None, run_this=False):
+        if run_this and self.player_id == 1 and state is not None:
+            policy = self.get_qs(state)
+            statevalue = self.get_statevalue(state)
+            printtitle = f"qs/policy"
+            if title is not None:
+                printtitle += f" >> {title}"
+            with np.printoptions(precision=4, suppress=True):
+                print(f"qs/policy >> before training > {self.last_policy}")
+                print(f"{printtitle} >> {policy}")
+
+            if not (self.last_policy == policy).all():
+                diff = policy - self.last_policy
+                with np.printoptions(precision=4, suppress=True):
+                    print(f"change after training:{diff}")
+
+            print(f"state value: {np.round(statevalue, 4)}")
+
     def print_probability_info(self, probs, action):
         print(f"raw q: {np.round(self.last_policy, 3)} -> argmax: {np.argmax(self.last_policy)}")
         print(f"probs: {np.round(probs, 3)} -> action: {action}")
+
+    def get_statevalue(self, state):
+        """implement this in childclass as needed"""
+        return None
 
 
 class Human(Player):
@@ -233,6 +259,9 @@ class Stick(Player):
         action = self.select_cell(*args, **kwargs)
         return action
 
+    def get_qs(self, *args, **kwargs):
+        return self.last_policy
+
 
 class Selfplay(Player):
     def __init__(self, player, *args, **kwargs):
@@ -262,6 +291,220 @@ class Selfplay(Player):
         # pass througt to player get_gs method
         policy = self.player.get_qs(*args, **kwargs)
         return policy
+
+
+class newA2CAgent(Player):
+    def __init__(self, models, discount, *args, enriched_features=True):
+        """
+        policy agent\n
+        """
+        super().__init__(*args)
+        self.enriched_features = enriched_features
+
+        # These are hyper parameters for the Policy Gradient
+        self.discount_factor = discount  # 0.99
+
+        # create models for policy network
+        #self.policy_model = models.policy_model
+        #self.predict_model = models.predict_model
+        self.models_dic = models.models_dic
+        #self.policy_model = self.models_dic['policy_model']
+        #self.predict_model = self.models_dic['predict_model']
+
+        self.action_size = models.model.hyper_dict['output_num']    # get size of state and action
+        # model metadata
+        self.model = models.model                                   # for usage in setup_for_training() - > needs proper fix!
+        self.value_size = 1                                         # get size of state and action
+
+    def get_action(self, state, actionspace, **kwargs):
+        """ using the output of policy network, pick action stochastically"""
+        policy = self.get_qs(state)
+
+        self.set_policy_info(policy)
+
+        choise = np.random.choice(range(len(policy)), p=policy)
+        if choise not in actionspace:
+            choise = np.random.choice(actionspace)
+
+        self.set_probability_info(policy)
+        return choise
+
+    def get_qs(self, state):
+        state = state[np.newaxis, :, :]  # add one dimention in order to work (6,7,4) => (1,6,7,4)
+        #policy = self.predict_model.predict(state).flatten()
+        policy = self.models_dic['predict_model'].predict(state).flatten()
+        return policy
+
+    def get_statevalue(self, state):
+        state = state[np.newaxis, :, :]  # add one dimention in order to work (6,7,4) => (1,6,7,4)
+        value = self.models_dic['critic_model'].predict(state).flatten()
+        return value
+
+    def select_cell(self, state, actionspace, **kwargs):
+
+        qs = self.get_qs(state)
+
+        self.last_policy = qs           # for logging purposes (tensorboard)
+        self.last_probabilities = qs    # for logging purposes (tensorboard)
+
+        # overrule model probabilties according to the (modified) actionspace
+        for key, prob in enumerate(qs):
+            if key not in actionspace:
+                qs[key] = -99999  # set to low probability
+        action = np.argmax(qs)
+        return action
+
+    def discounted_rewards(self, rewards):
+        """Compute the discounted rewards over an episode
+        (https://github.com/germain-hug/Deep-RL-Keras/blob/master/A2C/a2c.py)
+        """
+        discounted_r, cumul_r = np.zeros_like(rewards), 0
+        for t in reversed(range(0, len(rewards))):
+            cumul_r = rewards[t] + cumul_r * self.discount_factor
+            discounted_r[t] = cumul_r
+        return discounted_r
+
+    def norm_rewards(self, discounted_r):
+        # scale the rewards: reinforcement baseline (algoritm) -> https://www.youtube.com/watch?v=IS0V8z8HXrM (16 minute)
+        mean = np.mean(discounted_r)
+        std = np.std(discounted_r) if np.std(discounted_r) > 0 else 1
+        normalized_r = (discounted_r - mean) / std
+        return normalized_r
+
+    # update policy network every step
+    def train_model_step(self, state, action, reward, next_state, done):
+        """ Update policy from experience 
+        \n
+        https://youtu.be/2vJtbAha3To
+        """
+        state = state[np.newaxis, :, :]
+        next_state = next_state[np.newaxis, :, :]
+
+        critic_value_next = self.models_dic['critic_model'].predict(next_state)
+        critic_value = self.models_dic['critic_model'].predict(state)
+
+        target = reward + self.discount_factor * critic_value_next * (1 - int(done))
+        advantage = target - critic_value
+
+        action_onehot = np.zeros([1, self.action_size])
+        action_onehot[np.arange(1), action] = 1
+
+        # Networks optimization
+        if hasattr(self, 'tensorboard'):
+            callback = [self.tensorboard]
+        else:
+            callback = []
+
+        cost_actor = self.models_dic['actor_model'].fit([state, advantage], action_onehot, epochs=1, verbose=0, callbacks=callback)
+        cost_critic = self.models_dic['critic_model'].fit(state, target, epochs=1, verbose=0)
+
+        return cost_actor, cost_critic
+
+
+class PolicyAgent(Player):
+    def __init__(self, models, discount, *args, enriched_features=True):
+        """
+        policy agent\n
+        """
+        super().__init__(*args)
+        self.enriched_features = enriched_features
+
+        # These are hyper parameters for the Policy Gradient
+        self.discount_factor = discount  # 0.99
+
+        # create models for policy network
+        #self.policy_model = models.policy_model
+        #self.predict_model = models.predict_model
+        self.models_dic = models.models_dic
+        #self.policy_model = self.models_dic['policy_model']
+        #self.predict_model = self.models_dic['predict_model']
+
+        self.action_size = models.model.hyper_dict['output_num']    # get size of state and action
+        # model metadata
+        self.model = models.model                                   # for usage in setup_for_training() - > needs proper fix!
+        self.value_size = 1                                         # get size of state and action
+
+    def get_action(self, state, actionspace, **kwargs):
+        """ using the output of policy network, pick action stochastically"""
+        policy = self.get_qs(state)
+
+        self.set_policy_info(policy)
+
+        choise = np.random.choice(range(len(policy)), p=policy)
+        if choise not in actionspace:
+            choise = np.random.choice(actionspace)
+
+        self.set_probability_info(policy)
+        return choise
+
+    def get_qs(self, state):
+        state = state[np.newaxis, :, :]  # add one dimention in order to work (6,7,4) => (1,6,7,4)
+        #policy = self.predict_model.predict(state).flatten()
+        policy = self.models_dic['predict_model'].predict(state).flatten()
+        return policy
+
+    def select_cell(self, state, actionspace, **kwargs):
+
+        qs = self.get_qs(state)
+
+        self.last_policy = qs           # for logging purposes (tensorboard)
+        self.last_probabilities = qs    # for logging purposes (tensorboard)
+
+        # overrule model probabilties according to the (modified) actionspace
+        for key, prob in enumerate(qs):
+            if key not in actionspace:
+                qs[key] = -99999  # set to low probability
+        action = np.argmax(qs)
+        return action
+
+    def discounted_rewards(self, rewards):
+        """Compute the discounted rewards over an episode
+        (https://github.com/germain-hug/Deep-RL-Keras/blob/master/A2C/a2c.py)
+        """
+        discounted_r, cumul_r = np.zeros_like(rewards), 0
+        for t in reversed(range(0, len(rewards))):
+            cumul_r = rewards[t] + cumul_r * self.discount_factor
+            discounted_r[t] = cumul_r
+        return discounted_r
+
+    def discounted_rewards_norm(self, rewards):
+        """Compute the discounted rewards over an episode\n
+        with normalisation
+        https://www.youtube.com/watch?v=IS0V8z8HXrM (16 minute)"""
+
+        discounted_r = np.zeros_like(rewards)
+        for t in range(len(rewards)):
+            cumul_r = 0
+            discount = 1
+            for k in range(t, len(rewards)):
+                cumul_r += rewards[k] * discount
+                discount *= self.discount_factor
+            discounted_r[t] = cumul_r
+
+    def norm_rewards(self, discounted_r):
+        # scale the rewards: reinforcement baseline (algoritm) -> https://www.youtube.com/watch?v=IS0V8z8HXrM (16 minute)
+        mean = np.mean(discounted_r)
+        std = np.std(discounted_r) if np.std(discounted_r) > 0 else 1
+        normalized_r = (discounted_r - mean) / std
+        return normalized_r
+
+    # update policy network every episode
+    def train_model(self, states, actions, rewards):
+        """ Update policy from experience
+        """
+        # Compute discounted rewards and Advantage
+        discounted_rewards = self.discounted_rewards_norm(rewards)
+        discounted_rewards = self.norm_rewards(discounted_rewards)
+        states = np.array(states)
+
+        actions_onehot = np.zeros((len(actions), self.action_size))
+        actions_onehot[np.arange(len(actions)), actions] = 1
+
+        # Networks optimization
+        #cost = self.policy_model.fit([states, discounted_rewards], actions_onehot, epochs=1, verbose=0, callbacks=[self.tensorboard])
+        cost = self.models_dic['policy_model'].fit([states, discounted_rewards], actions_onehot, epochs=1, verbose=0, callbacks=[self.tensorboard])
+
+        return cost
 
 
 class A2CAgent(Player):
