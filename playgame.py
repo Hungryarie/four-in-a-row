@@ -23,7 +23,7 @@ from constants import TrainingParameters
 from model import load_a_model, model1, model1b, model1c, model1d, model2, model3, model4a, model4b, model5
 # functional API specific
 from model import func_model1_small_conv, func_model1, func_model_duel1b, func_model_duel1b1, func_model_duel1b2, func_model2, func_model5, func_model5_duel1
-from model import ACmodel1, ACmodel2
+from model import ACmodel1, ACmodel2, PolicyModel1, ACmodel2PHIL
 from analyse import AnalyseModel
 
 
@@ -32,6 +32,8 @@ def train_in_class():
     random.seed(2)
     np.random.seed(2)
     tf.random.set_seed(2)
+
+    tf.compat.v1.disable_eager_execution()
 
     # load training parameters
     param = TrainingParameters()
@@ -46,28 +48,37 @@ def train_in_class():
     #                    par_loss='categorical_crossentropy', par_opt=Adam(lr=0.001, clipnorm=1.0, clipvalue=0.25), par_metrics='accuracy', par_final_act='softmax', par_layer_multiplier=1)  # , par_layer_multiplier=2
     #critic = func_model2(input_shape=input_shape, output_num=1,
     #                     par_loss='mse', par_opt=Adam(lr=0.005, clipnorm=1.0, clipvalue=0.5), par_metrics='accuracy', par_final_act='linear', par_layer_multiplier=2)  # , par_layer_multiplier=1
-    acmodel = ACmodel2(input_shape=input_shape, output_num=output_num,
-                       par_loss=['categorical_crossentropy', 'mse'], par_opt=Adam(lr=0.001, clipnorm=1.0, clipvalue=0.25), par_metrics='accuracy', par_final_act='softmax', par_layer_multiplier=1)
+    policymodel = PolicyModel1(input_shape=input_shape, output_num=output_num,
+                               par_loss=['categorical_crossentropy', 'mse'], par_opt=Adam(lr=0.001, clipnorm=1.0, clipvalue=0.25), par_metrics='accuracy', par_final_act='softmax', par_layer_multiplier=1)
+    acmodel = ACmodel2PHIL(input_shape=input_shape, output_num=output_num,
+                           par_loss=['categorical_crossentropy', 'mse'], par_opt=[Adam(lr=0.00001, clipnorm=1.0, clipvalue=0.25), Adam(lr=0.00005, clipnorm=1.0, clipvalue=0.25)], par_metrics='accuracy', par_final_act='softmax', par_layer_multiplier=1)
+
+    acmodel2 = ACmodel2PHIL(input_shape=input_shape, output_num=output_num,
+                            par_loss=['categorical_crossentropy', 'mse'], par_opt=[Adam(lr=0.00001, clipnorm=1.0, clipvalue=0.25), Adam(lr=0.00005, clipnorm=1.0, clipvalue=0.25)], par_metrics='accuracy', par_final_act='softmax', par_layer_multiplier=1)
+
 
     # load players
     #p1 = players.A2CAgent(actor_model=actor, critic_model=critic, discount=param.DISCOUNT,
     #                      enriched_features=True)
-    p1 = players.A2CAgent(actor_model=None, critic_model=None, twohead_model=acmodel, discount=param.DISCOUNT,
-                          enriched_features=True)
+    #p1 = players.A2CAgent(actor_model=None, critic_model=None, twohead_model=acmodel, discount=param.DISCOUNT,
+    #                      enriched_features=True)
+    #p1 = players.PolicyAgent(models=policymodel, discount=param.DISCOUNT, enriched_features=True)
+    p1 = players.newA2CAgent(models=acmodel, discount=param.DISCOUNT, enriched_features=True)
     p1.name = "A2C on training"
     #p2 = players.Selfplay(p1)
     #p2.name = "selfplay"
-    p2 = players.Stick()
-    p2.name = "sticky"
+    #p2 = players.Stick()
+    #p2.name = "sticky"
+    p2 = players.newA2CAgent(models=acmodel2, discount=param.DISCOUNT, enriched_features=True)
+    p2.name = "A2C on training"
 
-    description = f"Resnet GET ACTION. reinforcement baseline (algoritm)"
+    description = f"real A2C vs A2C"
 
     env.add_players(p1, p2)
     training = TrainAgent(env, parameters=param, debug_flag=True)
     training.setup_training(train_description=description)
     training.run_training(start_id=p2.player_id)
     training.save_model(player=p1)  # save model after training
-
 
 
 def batch_train():
