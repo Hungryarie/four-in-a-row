@@ -2,7 +2,7 @@
 class TrainingParameters():
     def __init__(self):
         # Constants
-        self.DISCOUNT = 0.95  # 0.99
+        self.DISCOUNT = 0.99
         self.REPLAY_MEMORY_SIZE = 10_000  # 25_000  # 50_000  # How many last steps to keep for model training
         self.MIN_REPLAY_MEMORY_SIZE = 1_000  # Minimum number of steps in a memory to start training
         self.MINIBATCH_SIZE = 64  # How many steps (samples) to use for training
@@ -17,7 +17,7 @@ class TrainingParameters():
 
         # Exploration settings
         self.EPSILON_DECAY = 0.99975  # 0.99900
-        self.TAU_DECAY = 0.99900  # 0.99950 
+        self.TAU_DECAY = 0.99900  # 0.99950
         self.MIN_EPSILON = 0.001  # 0.25
         self.MIN_TAU = 0.006
 
