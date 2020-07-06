@@ -65,10 +65,24 @@ class model_base:
         self.regulatror_const = 0.0001
 
         # create models
-        self.model = self.create_model(input_shape, output_num)
-        self.target_model = self.create_model(input_shape, output_num)
-        self.compile_model(self.model)
-        self.compile_model(self.target_model)
+        self.model = None
+        self.compiled = False
+        model = self.create_model(input_shape, output_num)
+        if isinstance(model, dict):
+            self.models_dic = model
+            for key, value in model.items():
+                setattr(self, key, value)
+                # print(type(value))
+                if type(value) == tf.python.keras.engine.training.Model:
+                    self.model = value
+                if type(value) == tf.python.keras.engine.training_v1.Model:
+                    self.model = value
+        else:
+            self.model = model
+            #self.target_model = self.create_model(input_shape, output_num)
+        if self.compiled is False:
+            self.compile_model(self.model)
+            #self.compile_model(self.target_model)
 
         self.model.model_name = None
         self.model.timestamp = int(time.time())
@@ -79,10 +93,6 @@ class model_base:
         self.model._lr = format(self.model._lr, '.00000g')
         self.model.optimizer_name = self.model.optimizer.__class__.__name__
         self.model.fin_activation = self.fin_activation  # final activation
-        # print(self.model.optimizer.get_config())
-
-        # self.model.in_shape = input_shape
-        # self.model.out_num = output_num
 
         self.model.hyper_dict = {}
         self.model.hyper_dict['model_name'] = None
@@ -96,7 +106,7 @@ class model_base:
         self.model.hyper_dict['layer_multiplier'] = self.layer_multiplier
 
         # temporary fix.. see issue #6
-        time.sleep(2)  # needed for batch training otherwise with 2 same models there is a possibility that they will be instanciated at the same time, which causes tensorboard to append the logfile  onto each other.
+        time.sleep(2)  # needed for batch training otherwise with 2 same models there is a possibility that they will be instanciated at the same time, which causes tensorboard to append the logfile onto each other.
 
     # def he_normal(self):
     #    return initializers.he_normal(seed=None)
@@ -385,22 +395,17 @@ class func_model1(model_base):
         #            loss='categorical_crossentropy',
         #            metrics=['accuracy'])
         # model.compile happens in baseclass method compile_model()
-        return model
+        return {'model': model}
 
 
 class ACmodel1(model_base):
     """
     Good hyperparameters:
-    - par_loss='mse', par_opt=Adam(lr=0.001) against drunk and against itself
-
+    -
     Medium hyperparameters:
     -
-
     Bad hyperparameters:
-    - par_loss='logcosh', par_opt=Adam(lr=0.01), par_metrics='accuracy', par_final_act='linear' loss explosion at 600 steps
-    - par_loss='logcosh', par_opt=Adam(lr=0.001), par_metrics='accuracy', par_final_act='linear' loss explosion at 10k steps
-    - par_loss='categorical_crossentropy', par_opt=Adam(lr=0.01), clipnorm=1.0, clipvalue=0.5, par_metrics='accuracy', par_final_act='linear'
-    - par_loss='categorical_crossentropy', par_opt=Adam(lr=0.001), clipnorm=1.0, clipvalue=0.5, par_metrics='accuracy', par_final_act='linear'
+    - 
     """
     def __init__(self, **kwargs):
         # defaults keyword arguments
@@ -460,22 +465,17 @@ class ACmodel1(model_base):
 
         model = FuncModel(inputs=inputs, outputs=[act_predictions, crit_predictions])
 
-        return model
+        return {'model': model}
 
 
 class ACmodel2(model_base):
     """
     Good hyperparameters:
-    - par_loss='mse', par_opt=Adam(lr=0.001) against drunk and against itself
-
+    -
     Medium hyperparameters:
     -
-
     Bad hyperparameters:
-    - par_loss='logcosh', par_opt=Adam(lr=0.01), par_metrics='accuracy', par_final_act='linear' loss explosion at 600 steps
-    - par_loss='logcosh', par_opt=Adam(lr=0.001), par_metrics='accuracy', par_final_act='linear' loss explosion at 10k steps
-    - par_loss='categorical_crossentropy', par_opt=Adam(lr=0.01), clipnorm=1.0, clipvalue=0.5, par_metrics='accuracy', par_final_act='linear'
-    - par_loss='categorical_crossentropy', par_opt=Adam(lr=0.001), clipnorm=1.0, clipvalue=0.5, par_metrics='accuracy', par_final_act='linear'
+    -
     """
     def __init__(self, **kwargs):
         # defaults keyword arguments
@@ -508,7 +508,113 @@ class ACmodel2(model_base):
 
         model = FuncModel(inputs=inputs, outputs=[act_predictions, crit_predictions])
 
-        return model
+        return {'model': model}
+
+
+class ACmodel2PHIL(model_base):
+    """
+    Good hyperparameters:
+    -
+    Medium hyperparameters:
+    -
+    Bad hyperparameters:
+    -
+    """
+    def __init__(self, **kwargs):
+        # defaults keyword arguments
+        kwargs['par_loss'] = kwargs.pop('par_loss', 'mse')
+        kwargs['par_opt'] = kwargs.pop('par_opt', Adam(lr=0.001))
+        kwargs['par_metrics'] = kwargs.pop('par_metrics', 'accuracy')
+        kwargs['par_final_act'] = kwargs.pop('par_final_act', 'softmax')
+
+        super().__init__(**kwargs)
+        self.model.model_name = '3xconv+3xdenseSMALL3x3(twohead)-HEnormal(LEAKYReLu)'
+        self.model.hyper_dict['model_name'] = self.model.model_name
+        self.append_hyperpar_to_name()
+
+    def create_model(self, input_shape, output_num):
+        multipl = self.layer_multiplier
+
+        inputs = Input(shape=input_shape)
+        advantages = Input(shape=[1])
+        x = self.conv_layer(inputs, 75 * multipl, (3, 3))
+        #x = self.residual_layer(x, 75 * multipl, (3, 3))
+        #x = self.residual_layer(x, 75 * multipl, (3, 3))
+        #x = self.residual_layer(x, 75 * multipl, (3, 3))
+        x = Flatten()(x)
+        act = Dense(128 * multipl, use_bias=False, kernel_initializer='he_normal')(x)
+        act = BatchNormalization()(act)
+        act = LeakyReLU()(act)
+        #act = Dense(64 * multipl, activation='relu', kernel_initializer='he_normal')(act)
+        act_predictions = Dense(output_num, activation=self.fin_activation, kernel_initializer='he_normal')(act)
+
+        crit = Dense(128 * multipl, use_bias=False, kernel_initializer='he_normal')(x)
+        crit = BatchNormalization()(crit)
+        crit = LeakyReLU()(crit)
+        #crit = Dense(64 * multipl, activation='relu', kernel_initializer='he_normal')(crit)
+        crit_predictions = Dense(1, activation='tanh', kernel_initializer='he_normal')(crit)
+
+        def custom_loss(y_true, y_pred):
+            out = K.clip(y_pred, 1e-8, 1 - 1e-8)
+            log_liklyhood = y_true * K.log(out)
+            return K.sum(-log_liklyhood * advantages)
+
+        actor = FuncModel(inputs=[inputs, advantages], outputs=act_predictions)     # for training
+        critic = FuncModel(inputs=inputs, outputs=crit_predictions)                 # for training
+        predict = FuncModel(inputs=inputs, outputs=act_predictions)                 # for using
+
+        actor.compile(optimizer=self.opt[0], loss=custom_loss)
+        critic.compile(optimizer=self.opt[1], loss='mse')
+        predict.compile(optimizer=self.opt[1], loss='mse')
+
+        return {'actor_model': actor, 'critic_model': critic, 'predict_model': predict, 'compiled': True}
+
+
+class PolicyModel1(model_base):
+    """
+    https://www.youtube.com/watch?v=IS0V8z8HXrM
+    Good hyperparameters:
+    -
+    Medium hyperparameters:
+    -
+    Bad hyperparameters:
+    -
+    """
+    def __init__(self, **kwargs):
+        # defaults keyword arguments
+        kwargs['par_loss'] = kwargs.pop('par_loss', 'mse')
+        kwargs['par_opt'] = kwargs.pop('par_opt', Adam(lr=0.001))
+        kwargs['par_metrics'] = kwargs.pop('par_metrics', 'accuracy')
+        kwargs['par_final_act'] = kwargs.pop('par_final_act', 'softmax')
+
+        super().__init__(**kwargs)
+        self.model.model_name = 'policy network'
+        self.model.hyper_dict['model_name'] = self.model.model_name
+        self.append_hyperpar_to_name()
+
+    def create_model(self, input_shape, output_num):
+        multipl = self.layer_multiplier
+
+        inputs = Input(shape=input_shape)
+        advantages = Input(shape=[1])
+        x = self.conv_layer(inputs, 60 * multipl, (3, 3))
+        x = self.conv_layer(inputs, 60 * multipl, (3, 3))
+        x = Flatten()(x)
+        x = Dense(128 * multipl, activation='relu', kernel_initializer='he_normal')(x)
+        x = Dense(64 * multipl, activation='relu', kernel_initializer='he_normal')(x)
+        probs = Dense(output_num, activation=self.fin_activation, kernel_initializer='he_normal')(x)
+
+        def custom_loss(y_true, y_pred):
+            out = K.clip(y_pred, 1e-8, 1 - 1e-8)
+            log_liklyhood = y_true * K.log(out)
+            return K.sum(-log_liklyhood * advantages)
+
+        policy = FuncModel(inputs=[inputs, advantages], outputs=[probs])        # for training
+        policy.compile(optimizer=self.opt, loss=custom_loss)
+        predict = FuncModel(inputs=[inputs], outputs=[probs])                   # for using
+        predict.compile(optimizer=self.opt, loss='mse')
+
+        return {'policy_model': policy, 'predict_model': predict, 'compiled': True}
 
 
 class func_model_duel1b(model_base):
