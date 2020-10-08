@@ -157,7 +157,7 @@ class TrainAgent:
                 # analyse model graphically
                 if self.env.current_player == 1 or done:
                     self.analyse_model.update_model(self.env.player1.model)
-                    self.analyse_model.visual_debug_train(state=self.env.featuremap, turns=self.env.turns,
+                    self.analyse_model.visual_debug_train(state=self.env.get_state(), turns=self.env.turns,
                                                           save_to_file=save_to_file, print_num=False,
                                                           prefix=f'actor @ episode {self.count_stats.episode}')
                 if done:
@@ -165,7 +165,7 @@ class TrainAgent:
                         if self.env.player1.critic is not None:
                             self.analyse_model.reset_figs()
                             self.analyse_model.update_model(self.env.player1.critic)
-                            self.analyse_model.visual_debug_train(state=self.env.featuremap, turns=self.env.turns,
+                            self.analyse_model.visual_debug_train(state=self.env.get_state(), turns=self.env.turns,
                                                                   save_to_file=True, print_num=False,
                                                                   prefix=f'critic @ episode {self.count_stats.episode}')
                     self.analyse_model.reset_figs()
@@ -173,8 +173,18 @@ class TrainAgent:
     def _in_episode_stat_update(self):
         # for stats
         if self.env.active_player.player_id == 1:
+            if self.count_stats.episode > 1:
+                #self.count_stats.state_values.append(self.env.player1.train_step_info['critic_value_next_before'])
+                self.count_stats.state_values = np.append(self.count_stats.state_values, self.env.player1.train_step_info['critic_value_next_before'])
             self.env.player1.tensorboard.update_hist(p1_policyCentainty=self.env.player1.last_policy)
             self.env.player1.tensorboard.update_hist(p1_probabilities=self.env.player1.last_probabilities)
+            try:
+                self.env.player1.tensorboard.update_stats(loss_critic=self.env.player1.train_step_info['critic_loss'],
+                                                          loss_actor=self.env.player1.train_step_info['actor_loss'],
+                                                          loss_entropy=self.env.player1.train_step_info['entropy_loss'],
+                                                          loss_total=self.env.player1.train_step_info['total_loss'])
+            except AttributeError:
+                pass
         else:
             self.env.player1.tensorboard.update_hist(p2_policyCentainty=self.env.player2.last_policy)
             self.env.player1.tensorboard.update_hist(p2_probabilities=self.env.player2.last_probabilities)
@@ -277,7 +287,7 @@ class TrainAgent:
         # ACTION PART
 
         # get start state = mid state of opponent
-        self.step_dict['start_state'][self.env.active_player.player_id].append(np.copy(self.env.featuremap))
+        self.step_dict['start_state'][self.env.active_player.player_id].append(np.copy(self.env.get_state()))
         state = self.step_dict['start_state'][self.env.active_player.player_id][-1]
         if self.debug:
             pass
@@ -288,13 +298,13 @@ class TrainAgent:
             # get probability based action
             # self.count_stats.tau = self.count_stats.epsilon
             # action = self.env.active_player.get_prob_action(state=state, actionspace=self.env.action_space, tau=self.count_stats.tau)
-            action = self.env.active_player.get_action(state=state, actionspace=self.env.action_space)
+            action = self.env.active_player.get_action(state=state, actionspace=self.env.active_player.actionspace)
         else:
-            action = self.env.active_player.select_cell(state=state, actionspace=self.env.action_space)
+            action = self.env.active_player.select_cell(state=state, actionspace=self.env.active_player.actionspace)
 
         # next_state, [_, reward_p1, reward_p2], done, info = self.env.step(action)
         _, [_, reward_p1, reward_p2], done, info = self.env.step(action)
-        next_state = np.copy(self.env.featuremap)
+        next_state = np.copy(self.env.get_state())
 
         # log reward
         reward_arr = [None, None, None]
@@ -331,18 +341,12 @@ class TrainAgent:
             # reward after invalid move
             reward = self.step_dict['reward'][self.env.active_player.player_id][-1]
 
-            print("\n----------\n")
-            self.env.ShowField2(field=state)
-            print(f"\naction:{action}\n")
-            self.env.ShowField2(field=next_state)
-            print(f"\nreward:{reward}\n")
-
             if train_on_step:
                 self.env.active_player.train_model(state, action, reward, next_state, done)  # train with these parameters
                 self.env.active_player.train_model_step(state, action, reward, next_state, done)  # train with these parameters
                 # self.env.player1.train_model(state, action, reward, next_state, done)  # train with these parameters
 
-                self.env.active_player.print_policy_info(state, title="after training", run_this=self.debug)
+                self.print_train_step_info(player_id=self.env.active_player.player_id, title="train on invalid move")
         elif not done and train_on_step:
             # train on valid moves (from previous step)
             try:
@@ -359,39 +363,18 @@ class TrainAgent:
                 reward = None
 
             # state after opponents move
-            next_state = np.copy(
-                self.step_dict['mid_state'][self.env.active_player.player_id][-1])
-            # inverse players turn to simulate is is realy the next state and their turn.
-            next_state[:, :, 1] = self.env.active_player.inverse_state(
-                next_state[:, :, 1])
-
-            if self.debug:
-                print("\n----------\n")
-                print(f"Inactive player (id:{self.env.inactive_player.player_id}, value:{self.env.inactive_player.value}) (DONE=false) ")
-                if state is not None:
-                    self.env.ShowField2(field=state)
-                else:
-                    print("state is none")
-                print(f"action:{action}")
-                if next_state is not None:
-                    self.env.ShowField2(field=next_state)
-                else:
-                    print("next state is none")
-                print(f"reward:{reward}")
-
-                self.env.inactive_player.print_policy_info(state, title="before training", run_this=False)
+            next_state = np.copy(self.step_dict['mid_state'][self.env.active_player.player_id][-1])
+            if self.env.active_player.enriched_features:
+                # inverse players turn to simulate is is realy the next state and their turn.
+                next_state[:, :, 1] = self.env.active_player.inverse_state(next_state[:, :, 1])
 
             # only train when a previous step has been played. hence action should not be None.
             if action is not None:
-                # print("\n----------\n")
-                # self.env.ShowField2(field=state)
-                # print(f"\naction:{action}\n")
-                # self.env.ShowField2(field=next_state)
                 self.env.inactive_player.train_model(state, action, reward, next_state, done)   # train with these parameters
                 self.env.inactive_player.train_model_step(state, action, reward, next_state, done)   # train with these parameters
                 # self.env.player1.train_model(state, action, reward, next_state, done)   # train with these parameters
 
-            self.env.inactive_player.print_policy_info(state, title="after training", run_this=self.debug)
+                self.print_train_step_info(player_id=self.env.inactive_player.player_id, title="train on normal move")
 
         # train one final time when done==true. Otherwise the final (most important! => win/lose) action is not being trained on / logged.
         if done:
@@ -399,11 +382,6 @@ class TrainAgent:
             self.step_dict['reward'][self.env.inactive_player.player_id].append(reward_arr[self.env.inactive_player.player_id])
 
             if train_on_step:
-                # self.env.ShowField2()
-                if self.debug:
-                    self.env.render()
-                    print(self.env.Winnerinfo())
-
                 # (active player: winner)
                 # get state, action and reward for winner.
                 # begin state
@@ -416,23 +394,11 @@ class TrainAgent:
                 # reward = reward_arr[self.env.active_player.player_id]
                 reward = self.step_dict['reward'][self.env.active_player.player_id][-1]
 
-                if self.debug:
-                    print("\n----------\n")
-                    print(f"ACTIVE PLAYER (DONE=true) (id:{self.env.active_player.player_id}, value:{self.env.active_player.value})")
-                    # self.env.print_feature_space(field=state)
-                    # print(f"action:{action}")
-                    # self.env.print_feature_space(field=next_state)
-                    # print("\n----------\n")
-                    self.env.ShowField2(field=state)
-                    print(f"action:{action}")
-                    self.env.ShowField2(field=next_state)
-                    print(f"reward:{reward}")
-
                 self.env.active_player.train_model(state, action, reward, next_state, done)
                 self.env.active_player.train_model_step(state, action, reward, next_state, done)
                 # self.env.player1.train_model(state, action, reward, next_state, done)   # train with these parameters
 
-                self.env.active_player.print_policy_info(state, title="after training", run_this=self.debug)
+                self.print_train_step_info(player_id=self.env.active_player.player_id, title="train on winning/tie move")
 
                 # (inactive player : loser)
                 # get state, action and reward for loser, because it is based on previous step it is always the losing step.
@@ -441,36 +407,73 @@ class TrainAgent:
                 # action at begin state
                 action = self.step_dict['action'][self.env.inactive_player.player_id][-1]
                 # state after opponents move
-                next_state = np.copy(
-                    self.step_dict['mid_state'][self.env.active_player.player_id][-1])
-                # inverse players turn to simulate is is realy the next state and their turn.
-                next_state[:, :, 1] = self.env.active_player.inverse_state(
-                    next_state[:, :, 1])
+                next_state = np.copy(self.step_dict['mid_state'][self.env.active_player.player_id][-1])
+                if self.env.active_player.enriched_features:
+                    # inverse players turn to simulate is is realy the next state and their turn.
+                    next_state[:, :, 1] = self.env.active_player.inverse_state(next_state[:, :, 1])
                 # reward after winning move
                 # reward = reward_arr[self.env.inactive_player.player_id]
                 reward = self.step_dict['reward'][self.env.inactive_player.player_id][-1]
-
-                if self.debug:
-                    print("\n----------\n")
-                    print(f"INACTIVE PLAYER (DONE=true) (id:{self.env.inactive_player.player_id}, value:{self.env.inactive_player.value})\n")
-                    # self.env.print_feature_space(field=state)
-                    # print(f"action:{action}")
-                    # self.env.print_feature_space(field=next_state)
-                    # print("\n----------\n")
-                    self.env.ShowField2(field=state)
-                    print(f"action:{action}")
-                    self.env.ShowField2(field=next_state)
-                    print(f"reward:{reward}")
-
-                self.env.inactive_player.print_policy_info(state, title="before training", run_this=False)
 
                 self.env.inactive_player.train_model(state, action, reward, next_state, done)
                 self.env.inactive_player.train_model_step(state, action, reward, next_state, done)
                 # self.env.player1.train_model(state, action, reward, next_state, done)   # train with these parameters
 
-                self.env.inactive_player.print_policy_info(state, title="after training", run_this=self.debug)
+                self.print_train_step_info(player_id=self.env.inactive_player.player_id, title="train on losing move")
 
         return reward_p1, reward_p2, done
+
+    def print_train_step_info(self, player_id, title=None):
+        if player_id == 1 and self.debug:
+
+            info = self.env.player1.train_step_info
+            np.set_printoptions(precision=3, suppress=True, formatter={'float': '{: 0.3f}'.format})
+
+            print('\n###################################################')
+            print(f'--{title.upper()}--')
+            if info['done']:
+                print(self.env.Winnerinfo())
+            print('---- BEFORE new training step-----')
+            self.env.ShowField2(field=info['state'])
+            print(f"{'state value:':<25}{info['critic_value_before']:0.5f}")
+            print(f"{'qs/policy  >':<25}{info['actor_policy_before']}")
+            actionspace = ""# "[[   "
+            for column in range(self.env.columns):
+                if column in self.env.player1.actionspace:
+                    actionspace += f"{column:<7}"
+                else:
+                    actionspace += f"{'-':<7}"
+            print(f"{'actionspace  >':<30}{actionspace[:-4]}")
+            chosen = "     " #f"{' ':<7}{-}"
+            for space in range(info['action']):
+                chosen += "       "
+            print(f"{'chosen action:':<25}{chosen}{info['action']}")
+            self.env.ShowField2(field=info['next_state'])
+            print(f"{'reward:':<25}{info['reward']:0.2f}")
+            print(f"{'next_state value:':<25}{info['critic_value_next_before']:0.5f}")
+
+            print('---- Training with... -----')
+            print(f"{'done:':<25}{info['done']}")
+            print(f"{'advantage:':<25}{info['advantage']:0.5f}")
+
+            print(f"{'actor_loss:':<25}{info['actor_loss']:0.5f}")
+            print(f"{'entropy_loss:':<25}{info['entropy_loss']:0.5f}")
+            print(f"{'critic_loss:':<25}{info['critic_loss']:0.5f}")
+            print(f"{'total_loss:':<25}{info['total_loss']:0.5f}")
+            #print(f"{'target (state value):':<25}{info['target']}")
+
+            #print(f"{'y_pred_clip(out)':<25}{info['y_pred_clip']}")
+            #print(f"{'log_liklyhood':<25}{info['log_liklyhood']}")
+            #print(f"{'ksum':<25}{info['ksum']}")
+
+            print('---- AFTER new training step-----')
+            change_policy = info['actor_policy_after'] - info['actor_policy_before']
+            print(f"{'qs/policy  >':<25}{info['actor_policy_after']}")
+            print(f"{'change in policy:':<25}{change_policy}")
+            print(f"{'state value:':<25}{info['critic_value_after']}")
+            print(f"{'next_state value:':<25}{info['critic_value_next_after']}")
+
+            np.set_printoptions()
 
     def visualize_state_action_rewards(self, states, actions, rewards):
 
@@ -548,7 +551,7 @@ class TrainAgent:
 
         for model_name, model in player.models_dic.items():
             if type(model) == tf.python.keras.engine.training.Model or type(model) == tf.python.keras.engine.training_v1.Model:
-                new_model_name = f'models/A2C/{timestamp}-{int(time.time())}_ep{self.count_stats.episode}_{model_name}.model'
+                new_model_name = f'models/A2C/{timestamp}-{int(time.time())}_ep{self.count_stats.episode}_{model_name}'
                 path = os.path.normpath(os.path.join(os.getcwd(), new_model_name))
                 model.save(path)
 
@@ -568,6 +571,7 @@ class TrainAgent:
 
     def save_img(self, per_x_episode):
         if self.count_stats.episode % per_x_episode == 0:
+            # win/lose per episode
             plt.figure(figsize=(30, 20))
             plt.ylim(4 * self.para.reward_dict['lose'], 2 * self.para.reward_dict['win'])
 
@@ -580,6 +584,19 @@ class TrainAgent:
             try:
                 plt.savefig(
                     f"output/{time.time()}-Afourinarow_a2c ep{self.count_stats.episode}.png")
+            except Exception:
+                pass
+            plt.close()
+
+            # state value per step
+            plt.figure(figsize=(30, 20))
+            plt.grid(True)
+            history_length = min(1000, len(self.count_stats.state_values))
+            value = self.count_stats.state_values[-history_length:]
+            plt.plot(value, 'g')
+            try:
+                plt.savefig(
+                    f"output/{time.time()}-StateValue ep{self.count_stats.episode}.png")
             except Exception:
                 pass
             plt.close()
