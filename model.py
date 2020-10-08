@@ -1,4 +1,5 @@
 import tensorflow as tf
+import tensorflow_probability as tfp
 # from keras.callbacks import TensorBoard
 
 from tensorflow.keras import Sequential
@@ -45,6 +46,8 @@ class load_a_model:
         self.model.timestamp = int(time.time())
         self.model.model_class = self.__class__.__name__
         self.model.model_used_path = path
+
+        self.models_dic = {'predict_model': self.model}
         # temporary fix.. see issue #6
         time.sleep(2)  # needed for batch training otherwise with 2 same models there is a possibility that they will be instanciated at the same time, which causes tensorboard to append the logfile  onto each other.
 
@@ -89,17 +92,24 @@ class model_base:
         self.model.model_class = self.__class__.__name__
 
         # for stats and logging
-        self.model._lr = K.eval(self.model.optimizer.lr)
-        self.model._lr = format(self.model._lr, '.00000g')
-        self.model.optimizer_name = self.model.optimizer.__class__.__name__
+        self.model.hyper_dict = {}
+        if self.model.optimizer is not None:
+            self.model._lr = K.eval(self.model.optimizer.lr)
+            self.model._lr = format(self.model._lr, '.00000g')
+            self.model.optimizer_name = self.model.optimizer.__class__.__name__
+        else:
+            self.model._lr = self.opt[0]._hyper['learning_rate']
+            self.model._lr = format(self.model._lr, '.00000g')
+            self.model.optimizer_name = self.opt[0].__class__.__name__
+            self.model.hyper_dict['loss 0'] = self.loss[0]
+            self.model.hyper_dict['loss 1'] = self.loss[1]
         self.model.fin_activation = self.fin_activation  # final activation
 
-        self.model.hyper_dict = {}
         self.model.hyper_dict['model_name'] = None
         self.model.hyper_dict['timestamp'] = int(time.time())
         self.model.hyper_dict['model_class'] = self.__class__.__name__
-        self.model.hyper_dict['learning_rate'] = format(K.eval(self.model.optimizer.lr), '.00000g')
-        self.model.hyper_dict['optimizer_name'] = self.model.optimizer.__class__.__name__
+        self.model.hyper_dict['learning_rate'] = self.model._lr
+        self.model.hyper_dict['optimizer_name'] = self.model.optimizer_name
         self.model.hyper_dict['final_activation'] = self.fin_activation
         self.model.hyper_dict['input_shape'] = input_shape
         self.model.hyper_dict['output_num'] = output_num
@@ -120,6 +130,9 @@ class model_base:
         # elif self.loss == 'huber_loss_mean':
         #    self.loss = self.huber_loss_mean
 
+        if type(self.opt) == list:
+            if len(self.opt) == 1:
+                self.opt = self.opt[0]
         model.compile(loss=self.loss, optimizer=self.opt, metrics=[self.metrics])
 
     def append_hyperpar_to_name(self):
@@ -405,7 +418,7 @@ class ACmodel1(model_base):
     Medium hyperparameters:
     -
     Bad hyperparameters:
-    - 
+    -
     """
     def __init__(self, **kwargs):
         # defaults keyword arguments
@@ -485,7 +498,7 @@ class ACmodel2(model_base):
         kwargs['par_final_act'] = kwargs.pop('par_final_act', 'softmax')
 
         super().__init__(**kwargs)
-        self.model.model_name = '3xconv+3xdenseSMALL3x3(twohead)-HEnormal(LEAKYReLu) RESIDUAL'
+        self.model.model_name = '3xconv+3xdenseSMALL3x3(twohead)-HEnormal(ReLu) RESIDUAL'
         self.model.hyper_dict['model_name'] = self.model.model_name
         self.append_hyperpar_to_name()
 
@@ -495,8 +508,8 @@ class ACmodel2(model_base):
         inputs = Input(shape=input_shape)
         x = self.conv_layer(inputs, 75 * multipl, (3, 3))
         x = self.residual_layer(x, 75 * multipl, (3, 3))
-        x = self.residual_layer(x, 75 * multipl, (3, 3))
-        x = self.residual_layer(x, 75 * multipl, (3, 3))
+        #x = self.residual_layer(x, 75 * multipl, (3, 3))
+        #x = self.residual_layer(x, 75 * multipl, (3, 3))
         x = Flatten()(x)
         act = Dense(128 * multipl, activation='relu', kernel_initializer='he_normal')(x)
         act = Dense(64 * multipl, activation='relu', kernel_initializer='he_normal')(act)
@@ -504,11 +517,29 @@ class ACmodel2(model_base):
 
         crit = Dense(128 * multipl, activation='relu', kernel_initializer='he_normal')(x)
         crit = Dense(64 * multipl, activation='relu', kernel_initializer='he_normal')(crit)
-        crit_predictions = Dense(1, activation='linear', kernel_initializer='he_normal')(crit)
+        crit_value = Dense(1, activation='tanh', kernel_initializer='he_normal')(crit)
 
-        model = FuncModel(inputs=inputs, outputs=[act_predictions, crit_predictions])
+        model = FuncModel(inputs=inputs, outputs=[act_predictions, crit_value])
 
-        return {'model': model}
+        return {'model': model, 'compiled': False, 'loss_fns': [self.loss_fn1, self.loss_fn2]}
+
+    def loss_fn1(self, action, probs, advantage):
+        action_probs = tfp.distributions.Categorical(probs=probs)
+        log_prob = action_probs.log_prob(action)
+
+        actor_loss = -log_prob * advantage
+        critic_loss = (1-advantage)**2
+        total_loss = actor_loss + critic_loss
+        return total_loss
+
+    def loss_fn2(self, action, probs, advantage):
+        action_probs = tfp.distributions.Categorical(probs=probs)
+        log_prob = action_probs.log_prob(action)
+
+        actor_loss = -log_prob * advantage
+        critic_loss = (1-advantage)**2
+        total_loss = actor_loss + critic_loss
+        return total_loss
 
 
 class ACmodel2PHIL(model_base):
@@ -536,9 +567,9 @@ class ACmodel2PHIL(model_base):
         multipl = self.layer_multiplier
 
         inputs = Input(shape=input_shape)
-        advantages = Input(shape=[1])
-        x = self.conv_layer(inputs, 75 * multipl, (3, 3))
-        #x = self.residual_layer(x, 75 * multipl, (3, 3))
+        #advantages = Input(shape=[1])
+        x = self.conv_layer(inputs, 50 * multipl, (3, 3))
+        x = self.residual_layer(x, 75 * multipl, (3, 3))
         #x = self.residual_layer(x, 75 * multipl, (3, 3))
         #x = self.residual_layer(x, 75 * multipl, (3, 3))
         x = Flatten()(x)
@@ -552,20 +583,21 @@ class ACmodel2PHIL(model_base):
         crit = BatchNormalization()(crit)
         crit = LeakyReLU()(crit)
         #crit = Dense(64 * multipl, activation='relu', kernel_initializer='he_normal')(crit)
-        crit_predictions = Dense(1, activation='tanh', kernel_initializer='he_normal')(crit)
+        crit_predictions = Dense(1, activation='linear', kernel_initializer='he_normal')(crit)
 
         def custom_loss(y_true, y_pred):
             out = K.clip(y_pred, 1e-8, 1 - 1e-8)
             log_liklyhood = y_true * K.log(out)
             return K.sum(-log_liklyhood * advantages)
 
-        actor = FuncModel(inputs=[inputs, advantages], outputs=act_predictions)     # for training
+        #actor = FuncModel(inputs=[inputs, advantages], outputs=act_predictions)     # for training
+        actor = FuncModel(inputs=[inputs], outputs=act_predictions)     # for training
         critic = FuncModel(inputs=inputs, outputs=crit_predictions)                 # for training
         predict = FuncModel(inputs=inputs, outputs=act_predictions)                 # for using
 
-        actor.compile(optimizer=self.opt[0], loss=custom_loss)
-        critic.compile(optimizer=self.opt[1], loss='mse')
-        predict.compile(optimizer=self.opt[1], loss='mse')
+        # actor.compile(optimizer=self.opt[0], loss=custom_loss)
+        # critic.compile(optimizer=self.opt[1], loss='mse')
+        # predict.compile(optimizer=self.opt[1], loss='mse')
 
         return {'actor_model': actor, 'critic_model': critic, 'predict_model': predict, 'compiled': True}
 
