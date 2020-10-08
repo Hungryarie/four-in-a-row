@@ -28,7 +28,7 @@ class environment(FiarGame):
         inputs: start_id (optional). Give the player_id who will start. Otherwise random.
         """
         super().reset()
-        self.action_space = self.GetActionSpace()
+        #self.action_space = self.GetActionSpace()
 
         if start_id is not None:
             # overrule the random player start and forces the given player to start
@@ -36,11 +36,7 @@ class environment(FiarGame):
             self.current_player_value = self.getPlayerById(self.current_player).value
             self._feature_space_active_player()
 
-        if self.active_player.enriched_features:
-        # if self.enriched_features:
-            return self.featuremap
-        else:
-            return self.playingField
+        return self.get_state()
 
     def add_players(self, p1, p2):
         super().add_players(p1, p2)
@@ -73,7 +69,7 @@ class environment(FiarGame):
         returns a random action from the actionspace.
         """
         # return random.randint(0, self.action_space_n - 1)
-        return np.random.choice(self.action_space)
+        return np.random.choice(self.active_player.actionspace)
 
     def get_selfplay_action(self):
         """get the selfplay action by reversing the playingfield and using the policy from the agent who is training"""
@@ -89,7 +85,7 @@ class environment(FiarGame):
         # self.print_feature_space()
         # print("###end###")
         # state = self.featuremap[np.newaxis, :, :]
-        selfplay_action = self.inactive_player.select_cell(state=self.featuremap, actionspace=self.action_space)
+        selfplay_action = self.inactive_player.select_cell(state=self.featuremap, actionspace=self.inactive_player.actionspace)
         self.featuremap[:, :, 0] = self.active_player.inverse_state(self.featuremap[:, :, 0])  # reverse field back to original game status
         self.featuremap[:, :, 1] = self.active_player.inverse_state(self.featuremap[:, :, 1])  # reverse players turn aswell.
 
@@ -140,6 +136,15 @@ class environment(FiarGame):
             reward = 1
         return reward
 
+    def get_state(self):
+        # print(f"featuremap size: {self.get_feature_size(self.active_player.enriched_features)}")
+        # if self.enriched_features:
+        if self.active_player.enriched_features:
+            self.enrich_feature_space()  # enrich always (needed for training)
+            return self.featuremap
+        else:
+            return self.playingField
+
     def step(self, action):
         """
         returns
@@ -148,27 +153,21 @@ class environment(FiarGame):
         self.addCoin(action, coin_value=self.active_player.value)
         self.CheckGameEnd()
 
-        self.enrich_feature_space()  # enrich always (needed for training)
-        if self.active_player.enriched_features:
-        # if self.enriched_features:
-            state = self.featuremap
-        else:
-            state = self.playingField
+        state = self.get_state()
 
-        # return self.playingField, self.reward(reward_clipping=False), self.done, self.info()
-        # return self.featuremap, self.reward(reward_clipping=False), self.done, self.info()
         return state, self.reward(reward_clipping=False), self.done, self.info()
 
     def block_invalid_moves(self, x=10):
         """
         after x attempts block the invalid moves in the action_space. Preventing the model from getting in a loop.
         """
-        if isinstance(self._invalid_move_action, int) and self._invalid_move_count > x and self._invalid_move_played is True:
+        if isinstance(self._invalid_move_action, int) and (self._invalid_move_count > x or self.current_player == 2) and self._invalid_move_played is True:
             try:
-                self.action_space.remove(self._invalid_move_action)
+                #self.action_space.remove(self._invalid_move_action)
+                self.active_player.actionspace.remove(self._invalid_move_action)
                 logging.info(f"block action:{self._invalid_move_action} from trying (by player: {self.active_player})")
             except Exception:
-                logging.error(f'trying to remove item ({self._invalid_move_action}) from list ({self.action_space}) that does not excist. (by player: {self.active_player})')
+                logging.error(f'trying to remove item ({self._invalid_move_action}) from list ({self.active_player.actionspace}) that does not excist. (by player: {self.active_player})')
 
     def info(self):
         dicti = {"active_player": self.active_player.name,
@@ -199,15 +198,11 @@ class environment(FiarGame):
 
             if render:
                 print(f"> Turn: {self.active_player.name} (p{self.active_player.player_id}) (coin:{self.active_player.color})")
-                print(f' > Actionspace: {self.action_space}')
+                print(f' > Actionspace: {self.active_player.actionspace}')
 
-            if self.active_player.enriched_features:
-            # if self.enriched_features:
-                state = self.featuremap
-            else:
-                state = self.playingField
+            state = self.get_state()
 
-            action = self.active_player.select_cell(state=state, actionspace=self.action_space)
+            action = self.active_player.select_cell(state=state, actionspace=self.active_player.actionspace)
             observation, reward, done, info = self.step(action)
 
             if not self._invalid_move_played and not done:
