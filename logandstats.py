@@ -18,6 +18,7 @@ class Stats:
         self.tau = 1
         self.episode = 0
         self.episodes = []
+        self.state_values = np.empty(shape=(0, 0))
 
     def reset_stats(self):
         """Reset stats"""
@@ -84,7 +85,7 @@ class ModelLog():
         dic = {}
         dic['player_id'] = player_id
         dic['model_info'] = model_info
-        dic['model_loss'] = model.loss
+        # dic['model_loss'] = model.loss
         dic['model_acc'] = model.metrics
         if hasattr(model, 'hyper_dict'):
             dic.update(model.hyper_dict)  # extent dic with model hyper dictionary (eg. name, class, timestamp, optimizer name, learning rate, final activation layertype etc.)
