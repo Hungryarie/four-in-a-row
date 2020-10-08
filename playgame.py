@@ -33,28 +33,30 @@ def train_in_class():
     np.random.seed(2)
     tf.random.set_seed(2)
 
-    tf.compat.v1.disable_eager_execution()
+    #tf.compat.v1.disable_eager_execution()
 
     # load training parameters
     param = TrainingParameters()
+    enriched = False
 
     # load environment
     env = environment(reward_dict=param.reward_dict)
 
+
     # load models
-    input_shape = env.get_feature_size(enriched=True)  # get environment shape
+    input_shape = env.get_feature_size(enriched=enriched)  # get environment shape
     output_num = input_shape[1]
     #actor = func_model1(input_shape=input_shape, output_num=output_num,
     #                    par_loss='categorical_crossentropy', par_opt=Adam(lr=0.001, clipnorm=1.0, clipvalue=0.25), par_metrics='accuracy', par_final_act='softmax', par_layer_multiplier=1)  # , par_layer_multiplier=2
     #critic = func_model2(input_shape=input_shape, output_num=1,
     #                     par_loss='mse', par_opt=Adam(lr=0.005, clipnorm=1.0, clipvalue=0.5), par_metrics='accuracy', par_final_act='linear', par_layer_multiplier=2)  # , par_layer_multiplier=1
-    policymodel = PolicyModel1(input_shape=input_shape, output_num=output_num,
-                               par_loss=['categorical_crossentropy', 'mse'], par_opt=Adam(lr=0.001, clipnorm=1.0, clipvalue=0.25), par_metrics='accuracy', par_final_act='softmax', par_layer_multiplier=1)
-    acmodel = ACmodel2PHIL(input_shape=input_shape, output_num=output_num,
-                           par_loss=['categorical_crossentropy', 'mse'], par_opt=[Adam(lr=0.00001, clipnorm=1.0, clipvalue=0.25), Adam(lr=0.00005, clipnorm=1.0, clipvalue=0.25)], par_metrics='accuracy', par_final_act='softmax', par_layer_multiplier=1)
+    #policymodel = PolicyModel1(input_shape=input_shape, output_num=output_num,
+    #                          par_loss=['categorical_crossentropy', 'mse'], par_opt=Adam(lr=0.001, clipnorm=1.0, clipvalue=0.25), par_metrics='accuracy', par_final_act='softmax', par_layer_multiplier=1)
+    #acmodel = ACmodel2PHIL(input_shape=input_shape, output_num=output_num,
+    #                       par_loss=['categorical_crossentropy', 'mse'], par_opt=[Adam(lr=0.0001, clipnorm=1.0, clipvalue=0.25), Adam(lr=0.00005, clipnorm=1.0, clipvalue=0.25)], par_metrics='accuracy', par_final_act='softmax', par_layer_multiplier=1)
 
-    acmodel2 = ACmodel2PHIL(input_shape=input_shape, output_num=output_num,
-                            par_loss=['categorical_crossentropy', 'mse'], par_opt=[Adam(lr=0.00001, clipnorm=1.0, clipvalue=0.25), Adam(lr=0.00005, clipnorm=1.0, clipvalue=0.25)], par_metrics='accuracy', par_final_act='softmax', par_layer_multiplier=1)
+    acmodel = ACmodel2(input_shape=input_shape, output_num=output_num,
+                       par_loss=['loss_fn1', 'squared'], par_opt=[Adam(lr=0.0003, clipnorm=1.0, clipvalue=0.25)], par_metrics='accuracy', par_final_act='softmax', par_layer_multiplier=1)
 
 
     # load players
@@ -63,16 +65,16 @@ def train_in_class():
     #p1 = players.A2CAgent(actor_model=None, critic_model=None, twohead_model=acmodel, discount=param.DISCOUNT,
     #                      enriched_features=True)
     #p1 = players.PolicyAgent(models=policymodel, discount=param.DISCOUNT, enriched_features=True)
-    p1 = players.newA2CAgent(models=acmodel, discount=param.DISCOUNT, enriched_features=True)
+    #p1 = players.newA2CAgent(models=acmodel, discount=param.DISCOUNT, enriched_features=enriched)
+    p1 = players.newestA2CAgent(models=acmodel, discount=param.DISCOUNT, enriched_features=enriched)
     p1.name = "A2C on training"
     #p2 = players.Selfplay(p1)
     #p2.name = "selfplay"
-    #p2 = players.Stick()
-    #p2.name = "sticky"
-    p2 = players.newA2CAgent(models=acmodel2, discount=param.DISCOUNT, enriched_features=True)
-    p2.name = "A2C on training"
+    p2 = players.Stick(persistent=False)
+    p2.name = "sticky"
 
-    description = f"real A2C vs A2C"
+    p2.set_enriched_features(p1.enriched_features)      # set enriched_features status from p1 to p2
+    description = f"enriched features ={enriched} entropyloss"
 
     env.add_players(p1, p2)
     training = TrainAgent(env, parameters=param, debug_flag=True)
@@ -84,7 +86,6 @@ def train_in_class():
 def batch_train():
     model_list = []
     """
-
     model_list.append(model5(input_shape=(6, 7, 1), output_num=7,
                       par_loss='mse', par_opt=Adam(lr=0.001), par_metrics='accuracy'))
 
