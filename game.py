@@ -3,21 +3,16 @@ import random
 
 
 class FiarGame:
-    # REWARD_WINNING = 100  # 200  # 20
-    # REWARD_LOSING = -100  #-100  #-10
-    # REWARD_TIE = -99  #-99  # -5
-    # REWARD_INVALID_MOVE = -10   #-50  # -10  # -0.5
-    # REWARD_STEP = -1  #-5  # -0.5
 
     def __init__(self):
 
-        self.rows = 6
-        self.columns = 7
-        self._extra_toprows = 1  # extra rows at the top of the playingfield (can be used for feature engineering)
+        self.rows = 4  # 6
+        self.columns = 4  # 7
+        self._extra_toprows = 0  # 1  # extra rows at the top of the playingfield (can be used for feature engineering)
 
-        self.playingField = np.zeros([self.rows + self._extra_toprows, self.columns], dtype=float)  # int
+        self.playingField = np.zeros([self.rows + self._extra_toprows, self.columns], dtype=float)
         self.playingField = self.playingField[:, :, np.newaxis]
-        self.featuremap = np.zeros([self.rows + self._extra_toprows, self.columns, 4], dtype=float)  # int
+        self.featuremap = np.zeros([self.rows + self._extra_toprows, self.columns, 4], dtype=float)
 
         # self.reset()
 
@@ -25,12 +20,12 @@ class FiarGame:
         self.player1 = player1
         self.player1.color = "1"
         self.player1.player_id = 1
-        self.player1.value = 1.
+        self.player1.value = 0.05  #1.
 
         self.player2 = player2
         self.player2.color = "2"
         self.player2.player_id = 2
-        self.player2.value = -1
+        self.player2.value = 1.  # 0.5
 
         self.reset()
 
@@ -49,6 +44,9 @@ class FiarGame:
         self._invalid_move_action = None
         self.prev_invalid_move_count = 0        # for collecting the max in a row invalidmove count
         self.prev_invalid_move_reset = True
+
+        self.player1.actionspace = self.GetActionSpace()
+        self.player2.actionspace = self.GetActionSpace()
 
         self.featuremap_dict = {}
         self.enrich_feature_space()
@@ -206,7 +204,7 @@ class FiarGame:
             self.winner = self.checkForWinnerDiaLeft()
         if self.winner != 0:
             self.done = True
-        if self.checkFull():
+        elif self.checkFull():
             # check for a tie / draw
             self.done = True
 
@@ -364,7 +362,7 @@ class FiarGame:
             return False
             """
         if self._check_invalid_action_type(inColumn):
-            # invalid action played
+            # invalid action played, eg: beyond actionspace, wrong type etc.
             self._invalid_move_played = True
             self._invalid_move_action = inColumn
             return False
