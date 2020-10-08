@@ -2,8 +2,13 @@
 import random
 import numpy as np
 from abc import abstractmethod
+import tensorflow as tf
+import tensorflow_probability as tfp
 import tensorflow.keras.optimizers as ko
 from tensorflow.keras.utils import plot_model
+from tensorflow.keras.losses import Huber, CategoricalCrossentropy
+from tensorflow.keras.optimizers import Adam
+import tensorflow.keras.backend as K
 from collections import deque
 import time
 import os
@@ -30,12 +35,14 @@ class Player:
 
         self.setup = False
 
-        self.enriched_features = False
+        self.set_enriched_features(False)
 
         # self.last_policy = np.zeros(7)
         self.last_argmax = 0
         self.count_argmax_shift = 0
         self.policy_counter = 0
+
+        self.actionspace = [0, 1, 2, 3]     # Hack: apply the minimum actionspace, will be changed later on
 
     # def shutdown(self):
     #    pass
@@ -45,6 +52,9 @@ class Player:
 
     # def save(self, filename):
     #    pass
+
+    def set_enriched_features(self, enriched):
+        self.enriched_features = enriched
 
     def preprocess(self, state, actionspace, **kwargs):
         pass
@@ -170,24 +180,6 @@ class Player:
 
         return self.changiness
 
-    def print_policy_info(self, state, title=None, run_this=False):
-        if run_this and self.player_id == 1 and state is not None:
-            policy = self.get_qs(state)
-            statevalue = self.get_statevalue(state)
-            printtitle = f"qs/policy"
-            if title is not None:
-                printtitle += f" >> {title}"
-            with np.printoptions(precision=4, suppress=True):
-                print(f"qs/policy >> before training > {self.last_policy}")
-                print(f"{printtitle} >> {policy}")
-
-            if not (self.last_policy == policy).all():
-                diff = policy - self.last_policy
-                with np.printoptions(precision=4, suppress=True):
-                    print(f"change after training:{diff}")
-
-            print(f"state value: {np.round(statevalue, 4)}")
-
     def print_probability_info(self, probs, action):
         print(f"raw q: {np.round(self.last_policy, 3)} -> argmax: {np.argmax(self.last_policy)}")
         print(f"probs: {np.round(probs, 3)} -> action: {action}")
@@ -227,13 +219,19 @@ class Drunk(Player):
 
 class Stick(Player):
     """
-    Stick player always selects the same move, until column is full.
+    Stick player always selects the same move, until column is full.\n
+    when full:\n
+    if persistent=False, than a new fixed column is chosen.\n
+    if persistent=True, than a random colomn is chosen. Until the game restarts to default to the fixed column.
     """
-    def __init__(self):
+    def __init__(self, persistent=False):
         super().__init__()
-        self.reset_column()
+        self.reset_column(self.actionspace)
+        self.persistent = persistent
 
-    def reset_column(self, actionspace=[0, 1, 2, 3, 4, 5, 6]):
+    def reset_column(self, actionspace=None):   #[0, 1, 2, 3, 4, 5, 6]
+        if actionspace is None:
+            actionspace = self.actionspace
         self.column = np.random.choice(actionspace)
         self.last_policy = np.zeros(7)
         self.last_policy[self.column] = 1
@@ -246,7 +244,10 @@ class Stick(Player):
         # return random.randint(0,np.size(board,1)-1)
         # return random.randint(min(actionspace), max(actionspace))
         if self.column not in actionspace:
-            self.reset_column(actionspace)
+            if self.persistent:
+                return np.random.choice(actionspace)
+            else:
+                self.reset_column(actionspace)
         return self.column
 
     def get_prob_action(self, *args, **kwargs):
@@ -291,6 +292,164 @@ class Selfplay(Player):
         # pass througt to player get_gs method
         policy = self.player.get_qs(*args, **kwargs)
         return policy
+
+
+class newestA2CAgent(Player):
+    def __init__(self, models, discount, *args, enriched_features=True):
+        """
+        policy agent\n
+        """
+        super().__init__(*args)
+        self.enriched_features = enriched_features
+
+        # These are hyper parameters for the Policy Gradient
+        self.discount_factor = discount  # 0.99
+
+        # create models for policy network
+        #self.policy_model = models.policy_model
+        #self.predict_model = models.predict_model
+        self.models_dic = models.models_dic
+        #self.policy_model = self.models_dic['policy_model']
+        #self.predict_model = self.models_dic['predict_model']
+
+        self.action_size = models.model.hyper_dict['output_num']    # get size of state and action
+        # model metadata
+        self.model = models.model                                   # for usage in setup_for_training() - > needs proper fix!
+        self.value_size = 1                                         # get size of state and action
+
+    def get_action(self, state, actionspace, **kwargs):
+        """ using the output of policy network, pick action stochastically"""
+        policy = self.get_qs(state)
+        action_probs = tfp.distributions.Categorical(probs=policy)
+
+        self.set_policy_info(policy)
+        self.set_probability_info(policy)
+
+        action = -1
+        while action < 0:
+            self.action = action_probs.sample()
+            action = self.action.numpy()
+            if action not in actionspace:
+                if float(policy.numpy()[action]) > .99:     # prevents infinite loop
+                    action = np.random.choice(actionspace)
+                else:
+                    action = -1
+        return action
+
+    def get_qs(self, state):
+        ##state = state[np.newaxis, :, :]  # add one dimention in order to work (6,7,4) => (1,6,7,4)
+        state2 = tf.convert_to_tensor([state], dtype='float32')
+        #policy = self.predict_model.predict(state).flatten()
+        probabilities, value = self.models_dic['model'].predict(state2)  #.flatten()
+        probabilities = tf.squeeze(probabilities)
+
+        return probabilities
+
+    def get_statevalue(self, state):
+        ##state = state[np.newaxis, :, :]  # add one dimention in order to work (6,7,4) => (1,6,7,4)
+        state2 = tf.convert_to_tensor([state2], dtype='float32')
+        value = self.models_dic['model'].predict(state2)#.flatten()
+        value = tf.squeeze(value)
+        return value
+
+    def select_cell(self, state, actionspace, **kwargs):
+
+        qs = self.get_qs(state)
+
+        action_probs - tfp.distributions.Categorical(probs=qs)
+
+        self.last_policy = qs           # for logging purposes (tensorboard)
+        self.last_probabilities = action_probs    # for logging purposes (tensorboard)
+
+        # overrule model probabilties according to the (modified) actionspace
+        action = -1
+        while action >= 0:
+            action = action_probs.sample()
+            if action not in actionspace:
+                action = -1
+        return action
+
+    # update policy network every step
+    def train_model_step(self, state, action, reward, next_state, done):
+        """ Update policy from experience
+        \n
+        https://www.youtube.com/watch?v=LawaN3BdI00&t=1907s
+        """
+
+        self.train_step_info = {}
+        self.train_step_info['state'] = state
+        self.train_step_info['next_state'] = next_state
+
+        state = tf.convert_to_tensor([state], dtype='float32')
+        next_state = tf.convert_to_tensor([next_state], dtype='float32')
+        reward = tf.convert_to_tensor(reward, dtype='float32')
+
+        # self.train_step_info['actor_policy_before'], _ = self.models_dic['model'].predict(state)
+
+        #_, critic_value_next = self.models_dic['model'].predict(next_state)
+        #_, critic_value = self.models_dic['model'].predict(state)
+
+        def loss_fn2_withentropy(action, probs, advantage, beta=0.1, zeta=0.2):
+            action_probs = tfp.distributions.Categorical(probs=probs)
+            log_prob = action_probs.log_prob(action)
+
+            loss_actor = -log_prob - advantage
+            loss_entropy = beta * action_probs.entropy()
+            loss_critic = zeta * advantage**2  #(1-advantage)**2
+            #loss_total = loss_actor + loss_entropy + loss_critic
+            return loss_actor, loss_entropy, loss_critic
+
+        def loss_fn2_withentropy2(action, probs, reward, state_value, state_value_next, done, beta=0.15, zeta=0.2):
+            action_probs = tfp.distributions.Categorical(probs=probs)
+            log_prob = action_probs.log_prob(action)
+
+            if log_prob.numpy() > 20:
+                log_prob = log_prob / 2
+            delta = reward + 0.99 * state_value_next * (1 - int(done)) - state_value
+
+            loss_actor = (-log_prob * abs(reward) + reward - 0.5) * -1
+            loss_entropy = beta * action_probs.entropy()
+            loss_critic = zeta * delta**2  #(1-advantage)**2 tf.sqrt(delta**2)
+            #loss_total = loss_actor + loss_entropy + loss_critic
+            return loss_actor, loss_entropy, loss_critic, delta
+
+        with tf.GradientTape() as tape:
+            probs, state_value = self.models_dic['model'](state, training=False) # training=True
+            _, next_state_value = self.models_dic['model'](next_state, training=False)
+            state_value = tf.squeeze(state_value)
+            next_state_value = tf.squeeze(next_state_value)
+
+            #action_probs = tfp.distributions.Categorical(probs=probs)
+            #log_prob = action_probs.log_prob(action)
+            #delta = reward + self.discount_factor * next_state_value * (1 - int(done)) - state_value
+
+            #loss_actor, loss_entropy, loss_critic = loss_fn2_withentropy(action, probs, delta)
+            loss_actor, loss_entropy, loss_critic, delta = loss_fn2_withentropy2(action, probs, reward, state_value, next_state_value, done)
+            loss_total = loss_actor - loss_entropy + loss_critic
+
+            #actor_loss = -log_prob * delta
+            #critic_loss = (1-delta)**2
+            #total_loss = actor_loss + critic_loss
+
+        gradient = tape.gradient(loss_total, self.models_dic['model'].trainable_variables)
+        self.models_dic['model'].optimizer.apply_gradients(zip(gradient, self.models_dic['model'].trainable_variables))
+
+        self.train_step_info['actor_policy_before'] = probs
+        self.train_step_info['critic_value_before'] = state_value  # critic_value[0]
+        self.train_step_info['critic_value_next_before'] = next_state_value  # critic_value_next[0]
+        self.train_step_info['action'] = action
+        self.train_step_info['reward'] = reward
+        self.train_step_info['done'] = done
+        [self.train_step_info['actor_loss']] = loss_actor.numpy()
+        [self.train_step_info['entropy_loss']] = loss_entropy.numpy()
+        self.train_step_info['critic_loss'] = loss_critic.numpy()
+        [self.train_step_info['total_loss']] = loss_total.numpy()
+        #self.train_step_info['target'] = target[0]
+        self.train_step_info['advantage'] = delta.numpy()
+        _, self.train_step_info['critic_value_next_after'] = self.models_dic['model'].predict(next_state)
+        self.train_step_info['actor_policy_after'], self.train_step_info['critic_value_after'] = self.models_dic['model'].predict(state)
+        #self.train_step_info['action_onehot'] = action_onehot[0]
+        #return cost_actor, cost_critic
 
 
 class newA2CAgent(Player):
@@ -372,8 +531,8 @@ class newA2CAgent(Player):
         return normalized_r
 
     # update policy network every step
-    def train_model_step(self, state, action, reward, next_state, done):
-        """ Update policy from experience 
+    def train_model_step_OLD(self, state, action, reward, next_state, done):
+        """ Update policy from experience
         \n
         https://youtu.be/2vJtbAha3To
         """
@@ -399,6 +558,80 @@ class newA2CAgent(Player):
         cost_critic = self.models_dic['critic_model'].fit(state, target, epochs=1, verbose=0)
 
         return cost_actor, cost_critic
+
+    def train_model_step(self, state, action, reward, next_state, done):
+        """ Update policy from experience
+        \n
+        https://youtu.be/2vJtbAha3To
+        """
+
+        self.train_step_info = {}
+        self.train_step_info['state'] = state
+        self.train_step_info['next_state'] = next_state
+
+        state = state[np.newaxis, :, :]
+        next_state = next_state[np.newaxis, :, :]
+
+        self.train_step_info['actor_policy_before'] = self.models_dic['actor_model'].predict(state)[0]
+
+        critic_value_next = self.models_dic['critic_model'].predict(next_state)
+        critic_value = self.models_dic['critic_model'].predict(state)
+
+        target = reward + self.discount_factor * critic_value_next * (1 - int(done))
+        target = np.clip(target, -1.5, 1)
+        advantage = target - critic_value
+
+        action_onehot = np.zeros([1, self.action_size])
+        action_onehot[np.arange(1), action] = 1
+
+        def custom_loss(y_true, y_pred):
+            out = K.clip(y_pred, 1e-8, 1 - 1e-8)
+            log_liklyhood = y_true * K.log(out)
+            ksum = K.sum(-log_liklyhood * advantage)
+            self.train_step_info['y_pred_clip'] = out.numpy()[0]
+            self.train_step_info['log_liklyhood'] = log_liklyhood.numpy()[0]
+            self.train_step_info['ksum'] = ksum.numpy()
+            # print(f'clip pred: {out.numpy()}')
+            # print(f'log liklyhood: {log_liklyhood.numpy()}')
+            # print(f'loss: {ksum.numpy()}')
+            return ksum
+
+        # instanciate the loss functions
+        loss_fn_crit = Huber(delta=1.0, reduction="auto", name="huber_loss")
+        loss_fn_act = CategoricalCrossentropy(from_logits=False, label_smoothing=0, reduction="auto", name="categorical_crossentropy")
+        loss_fn_act = custom_loss
+
+        opt_crit = Adam(lr=0.00005)
+        opt_act = Adam(lr=0.00001)
+
+        with tf.GradientTape(persistent=True) as tape:
+            logits_crit = self.models_dic['critic_model'](state, training=True)
+            loss_value_crit = loss_fn_crit(target, logits_crit)
+
+        grads_crit = tape.gradient(loss_value_crit, self.models_dic['critic_model'].trainable_weights)
+
+        with tf.GradientTape(persistent=True) as tape:
+            logits_act = self.models_dic['actor_model'](state, training=True)
+            #loss_value_act = loss_fn_act(action_onehot, logits_act)
+            loss_value_act = custom_loss(action_onehot, logits_act)
+
+        grads_act = tape.gradient(loss_value_act, self.models_dic['actor_model'].trainable_weights)
+
+        opt_crit.apply_gradients(zip(grads_crit, self.models_dic['critic_model'].trainable_weights))
+        opt_act.apply_gradients(zip(grads_act, self.models_dic['actor_model'].trainable_weights))
+
+        self.train_step_info['critic_value_before'] = critic_value[0]
+        self.train_step_info['critic_value_next_before'] = critic_value_next[0]
+        self.train_step_info['action'] = action
+        self.train_step_info['reward'] = reward
+        self.train_step_info['done'] = done
+        self.train_step_info['target'] = target[0]
+        self.train_step_info['advantage'] = advantage[0]
+        self.train_step_info['critic_value_next_after'] = self.models_dic['critic_model'].predict(next_state)[0]
+        self.train_step_info['critic_value_after'] = self.models_dic['critic_model'].predict(state)[0]
+        self.train_step_info['actor_policy_after'] = self.models_dic['actor_model'].predict(state)[0]
+        self.train_step_info['action_onehot'] = action_onehot[0]
+        #return cost_actor, cost_critic
 
 
 class PolicyAgent(Player):
