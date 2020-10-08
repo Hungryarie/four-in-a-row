@@ -13,7 +13,7 @@ class TrainingParameters():
 
         # Environment settings
         self.EPISODES = 20_000
-        self.MAX_INVALID_MOVES = 5
+        self.MAX_INVALID_MOVES = 20 # 500 #5
 
         # Exploration settings
         self.EPSILON_DECAY = 0.99975  # 0.99900
@@ -35,5 +35,5 @@ class TrainingParameters():
         self.reward_dict['win'] = 1.
         self.reward_dict['lose'] = -1.
         self.reward_dict['tie'] = -0.9
-        self.reward_dict['invalid'] = -0.03  #-0.1
-        self.reward_dict['step'] = -0.01  #-0.05
+        self.reward_dict['invalid'] = -0.5  # -0.09  #-0.1
+        self.reward_dict['step'] = -0.1  # -0.01  #-0.05
