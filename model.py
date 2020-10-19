@@ -498,7 +498,7 @@ class ACmodel2(model_base):
         kwargs['par_final_act'] = kwargs.pop('par_final_act', 'softmax')
 
         super().__init__(**kwargs)
-        self.model.model_name = '3xconv+3xdenseSMALL3x3(twohead)-HEnormal(ReLu) RESIDUAL'
+        self.model.model_name = '3xconv+3xdenseSMALL3x3(twohead)-HEnormal(ReLu) RESIDUAL 2x'
         self.model.hyper_dict['model_name'] = self.model.model_name
         self.append_hyperpar_to_name()
 
