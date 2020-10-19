@@ -160,6 +160,8 @@ class TrainAgent:
                     self.analyse_model.visual_debug_train(state=self.env.get_state(), turns=self.env.turns,
                                                           save_to_file=save_to_file, print_num=False,
                                                           prefix=f'actor @ episode {self.count_stats.episode}')
+                else:
+                    self.analyse_model.record_state(self.env.get_state())
                 if done:
                     if hasattr(self.env.player1, 'critic'):
                         if self.env.player1.critic is not None:
