@@ -88,6 +88,7 @@ class AnalyseModel:
         self.state_fig = plt.figure()
         self.state_fig.suptitle('States')  # =actually the main title
         self.state_ims = []
+        self.state_memory_list = []
 
         self.activation_fig = plt.figure()
         self.activation_fig.suptitle(f'Activations for: {self.model_name}')  # =actually the main title
@@ -161,6 +162,9 @@ class AnalyseModel:
 
         self.n_features = n_features
 
+    def record_state(self, state):
+        self.state_memory_list.append(np.copy(state))
+
     def visualize_activations(self, state, turns, save_to_file):
         IMAGES_PER_ROW = 10
         BORDER_WIDTH = 2    # must be even!
@@ -170,7 +174,8 @@ class AnalyseModel:
         activations = self.activations  # get_activations(state)
         layer_names = self.activationlayer_names        # Names of the layers, so you can have them as part of your plot
 
-        self.state_memory_list.append(np.copy(state))
+        self.record_state(state)
+        #self.state_memory_list.append(np.copy(state))
 
         display_grid = []
         non_conv_layers_amount = 0
@@ -294,7 +299,9 @@ class AnalyseModel:
             MINIMUM_Y_LIM = 0.3
             y_lim = max(MINIMUM_Y_LIM, max(self.activation_mean_output[idx]))
             ax.set_xlim(-1, self.n_features[idx] + 1)
-            ax.set_ylim(min(self.activation_mean_output[idx]) - 0.1, y_lim)
+            current_y_lim = ax.get_ylim()
+            #ax.set_ylim(min(self.activation_mean_output[idx]) - 0.1, y_lim)
+            ax.set_ylim(min(current_y_lim[0], min(self.activation_mean_output[idx]) - 0.1), max(current_y_lim[1], y_lim))
 
             # Change major ticks to show every #.
             ax.xaxis.set_major_locator(MultipleLocator(1))
@@ -318,7 +325,7 @@ class AnalyseModel:
             state2 = np.array(state[:, :, 0])
             # print(state2)
 
-            ax.set_title(f'state at turn {turns-idx}')
+            ax.set_title(f'state at turn {turns-idx + 1}')
 
             # set x&y limits
             ax.set_xlim(-1, 8)
