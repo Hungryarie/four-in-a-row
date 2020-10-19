@@ -56,7 +56,7 @@ def train_in_class():
     #                       par_loss=['categorical_crossentropy', 'mse'], par_opt=[Adam(lr=0.0001, clipnorm=1.0, clipvalue=0.25), Adam(lr=0.00005, clipnorm=1.0, clipvalue=0.25)], par_metrics='accuracy', par_final_act='softmax', par_layer_multiplier=1)
 
     acmodel = ACmodel2(input_shape=input_shape, output_num=output_num,
-                       par_loss=['loss_fn1', 'squared'], par_opt=[Adam(lr=0.0003, clipnorm=1.0, clipvalue=0.25)], par_metrics='accuracy', par_final_act='softmax', par_layer_multiplier=1)
+                       par_loss=['loss_fn1', 'squared'], par_opt=[Adam(lr=0.0001, clipnorm=1.0, clipvalue=0.25)], par_metrics='accuracy', par_final_act='softmax', par_layer_multiplier=1)
 
 
     # load players
@@ -74,7 +74,7 @@ def train_in_class():
     p2.name = "sticky"
 
     p2.set_enriched_features(p1.enriched_features)      # set enriched_features status from p1 to p2
-    description = f"enriched features ={enriched} entropyloss"
+    description = f"enriched features ={enriched} beta=0.15, zeta=0.30 lossVSN3 actor powered"
 
     env.add_players(p1, p2)
     training = TrainAgent(env, parameters=param, debug_flag=True)
