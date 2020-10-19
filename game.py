@@ -20,7 +20,7 @@ class FiarGame:
         self.player1 = player1
         self.player1.color = "1"
         self.player1.player_id = 1
-        self.player1.value = 0.05  #1.
+        self.player1.value = 0.5  #1.
 
         self.player2 = player2
         self.player2.color = "2"
