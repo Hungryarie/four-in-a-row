@@ -332,6 +332,8 @@ class newestA2CAgent(Player):
             if action not in actionspace:
                 if float(policy.numpy()[action]) > .99:     # prevents infinite loop
                     action = np.random.choice(actionspace)
+                elif len(actionspace) == 1:
+                    action = actionspace[0]
                 else:
                     action = -1
         return action
@@ -399,17 +401,31 @@ class newestA2CAgent(Player):
             #loss_total = loss_actor + loss_entropy + loss_critic
             return loss_actor, loss_entropy, loss_critic
 
-        def loss_fn2_withentropy2(action, probs, reward, state_value, state_value_next, done, beta=0.15, zeta=0.2):
+        def loss_fn2_withentropy2(action, probs, reward, state_value, state_value_next, done, beta=0.15, zeta=0.30):
             action_probs = tfp.distributions.Categorical(probs=probs)
             log_prob = action_probs.log_prob(action)
 
-            if log_prob.numpy() > 20:
+            if log_prob.numpy() > 10:
                 log_prob = log_prob / 2
             delta = reward + 0.99 * state_value_next * (1 - int(done)) - state_value
 
             loss_actor = (-log_prob * abs(reward) + reward - 0.5) * -1
             loss_entropy = beta * action_probs.entropy()
             loss_critic = zeta * delta**2  #(1-advantage)**2 tf.sqrt(delta**2)
+            #loss_total = loss_actor + loss_entropy + loss_critic
+            return loss_actor, loss_entropy, loss_critic, delta
+
+        def loss_fn2_withentropy3(action, probs, reward, state_value, state_value_next, done, beta=0.15, zeta=0.30):
+            action_probs = tfp.distributions.Categorical(probs=probs)
+            log_prob = action_probs.log_prob(action)
+
+            if log_prob.numpy() > 10:
+                log_prob = log_prob / 2
+            delta = reward + 0.99 * state_value_next * (1 - int(done)) - state_value
+
+            loss_actor = ((-log_prob * abs(reward) + reward - 0.5) * -1)**2
+            loss_entropy = beta * action_probs.entropy()
+            loss_critic = zeta * (state_value_next - reward)**2  #(1-advantage)**2 tf.sqrt(delta**2)
             #loss_total = loss_actor + loss_entropy + loss_critic
             return loss_actor, loss_entropy, loss_critic, delta
 
@@ -424,7 +440,7 @@ class newestA2CAgent(Player):
             #delta = reward + self.discount_factor * next_state_value * (1 - int(done)) - state_value
 
             #loss_actor, loss_entropy, loss_critic = loss_fn2_withentropy(action, probs, delta)
-            loss_actor, loss_entropy, loss_critic, delta = loss_fn2_withentropy2(action, probs, reward, state_value, next_state_value, done)
+            loss_actor, loss_entropy, loss_critic, delta = loss_fn2_withentropy3(action, probs, reward, state_value, next_state_value, done)
             loss_total = loss_actor - loss_entropy + loss_critic
 
             #actor_loss = -log_prob * delta
